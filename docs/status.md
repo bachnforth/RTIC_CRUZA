@@ -16,6 +16,11 @@
 - On 217F95 the laptop (Alfa card, "Wi-Fi 2") gets a DHCP lease (10.0.0.10x); the backpack reports `enabled:true`, `gcs` = laptop IP, packets_up and packets_down both climbing.
 - QGC link: UDP, local port 14550, server address 10.0.0.1:14555. QGC shows the vehicle (Manual, battery %, RC, GPS) with the AIO on the flight battery and no USB.
 - Remaining check: mode switch (channel 7) follows in QGC over this link.
+- **The backpack's network name changed** (217F95 -> A3144A) and other ELRS radios are in range, so the saved Wi-Fi profile stopped matching and Windows left the Alfa adapter on 169.254.x.x. Do not trust a fixed SSID.
+- **Always run `tools/connect-backpack.ps1`** (normal PowerShell, no admin). It scans for "ExpressLRS TX Backpack *", asks which one is yours, saves a profile if needed, renews DHCP, and prints the backpack's counters.
+- **Always confirm the vehicle is yours before using QGC**: flip the channel 7 switch and watch the mode follow. Never arm or send commands until it does. To tell which network is yours, power the Pocket off/on and see which name disappears/returns (scan results can be stale: wait ~60 s).
+- If no backpack network is visible: Pocket on and linked ("C"), Backpack > Telemetry toggled Off then WiFi, wait 20 s.
+- Idea not yet tested: put the backpack in station mode on the phone hotspot (2.4 GHz) so the name no longer matters; QGC would then use `elrs_txbp.local:14555`.
 
 ## History of the problem (kept for reference)
 - Backpack AP is the plain-named "ExpressLRS TX Backpack" (identifies as "RadioMaster Pocket 2.4GHz TX"), IP 10.0.0.1.
