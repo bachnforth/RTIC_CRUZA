@@ -8,7 +8,7 @@
 - AIO params for MAVLink-over-ELRS: SERIAL4_PROTOCOL=2, SERIAL4_BAUD=460, RSSI_TYPE=5. SERIAL4 = UART4 = receiver (RC input).
 - ELRS versions: Pocket module 3.6.4, Pocket backpack 1.5.9 (latest), receiver (BETAFPV SuperD 2.4G) 3.5.6.
   - Receiver update to 3.6.4 failed twice over Wi-Fi ("Update Failed"); 3.5.6 succeeded.
-  - Binding phrase used on module and receiver builds: see ELRS Configurator builds (same phrase on both).
+  - Binding phrase used on the module and receiver builds (same on both): `PrairieKite-ELRS-7426`
 - Pocket settings: Link Mode = MAVLink (set with the receiver unpowered; ELRS refuses while linked), Backpack Telemetry = WiFi.
 
 ## RESOLVED 2026-10-07: MAVLink over ELRS to QGC works (no USB)
