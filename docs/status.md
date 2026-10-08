@@ -29,6 +29,22 @@
 - Parameter snapshots in `params/` (latest: cruza_params_2026-10-07_1835.params; QGC saves new ones to Documents\QGroundControl\Parameters).
 - Config pages in QGC need USB (the radio link does not download the full parameter list).
 
+## Status 2026-10-08 (morning, field test with phone QGC over USB)
+- **GPS works** (BeeID Pro M10): fix_type DGPS, 21 satellites, HDOP ~1.2, EKF3 origin set, terrain loaded. Settings that fixed detection (from a classmate with the same hardware): `GPS1_TYPE` u-blox, `GPS_AUTO_CONFIG` disabled, `SERIAL6_BAUD` 115200, `GPS1_RATE_MS` 100, `SERIAL6_OPTIONS` none. A TX/RX swap was tried and was not needed.
+- Classmate warns the BeeID relays GPS at ~9.1 Hz, which can make ArduPilot flag the GPS as lagged/unhealthy later; their fallback is a separate GPS (Matek M10Q-5883). Not verified on our aircraft; watch for "GPS unhealthy/lagged" messages.
+- `MAV2_PARAMS` = 2 on the ELRS port makes QGC's parameter download over ELRS usable (about 1 minute). ELRS packet rate 500 Hz doubles telemetry bandwidth at some range cost.
+- Battery failsafe actions on Plane: `BATT_FS_LOW_ACT`/`BATT_FS_CRT_ACT` = 1 is **RTL** on this firmware (Plane's list is not Copter's). Always use the names shown in QGC, not numbers.
+- **Remaining pre-arm failures:** "Check mag field (xy diff:181>100)" and "Gyros inconsistent". Plan: recalibrate compass outdoors away from metal; check whether the BeeID is tilted in its mount (classmate used a custom compass rotation with about 25 degrees pitch); reboot with the plane perfectly still for the gyros.
+- **Temporary / unsafe-for-flight settings to revert before flight:**
+  - `ARMING_SKIPCHK` = 4104 (skips GPS lock and GPS configuration checks). Untick GPS lock now that there is a real fix.
+  - `BATT_ARM_VOLT` = 13.2 (set back to 15.0 with a full pack).
+  - `ARMING_MAGTHRESH` must stay 100 for flight (only raise temporarily for a bench motor test).
+
+## BEFORE FIRST FLIGHT (temporary bench settings to revert)
+- `BATT_ARM_VOLT` is temporarily **13.2** (bench only). Set back to **15.0** (4S: 3.75 V/cell) before flight, with a pack charged to 16.8 V.
+- Battery: HRB 4S 4000 mAh. `BATT_VOLT_MULT` 20.7 verified (QGC 16.69 V vs multimeter 16.73 V). `BATT_CAPACITY` 4000. Low 14.0 V / critical 13.2 V; both actions should be 2 (RTL) until a landing sequence exists.
+- RC loss: `FS_LONG_ACTN` 1 (RTL). `RTL_AUTOLAND` 0 until the mission has a landing sequence.
+
 ## TODO (priority order)
 1. ESC/motor check with the propeller off, then set the ESC range if needed (SERVO4 min/max 1100/1900 now).
 2. Failsafes: RC loss, low battery, GPS loss; ARMING_RUDDER -> 0 so only ch8 arms.
