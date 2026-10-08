@@ -22,6 +22,20 @@
 - If no backpack network is visible: Pocket on and linked ("C"), Backpack > Telemetry toggled Off then WiFi, wait 20 s.
 - Idea not yet tested: put the backpack in station mode on the phone hotspot (2.4 GHz) so the name no longer matters; QGC would then use `elrs_txbp.local:14555`.
 
+## Aircraft: Hee Wing T2 Cruza (conventional: ailerons, elevator, rudder; twin motors)
+- Servo outputs: S1 aileron (reversed), S4 throttle (ESC), S5 elevator (reversed), S6 rudder; S2/S3 disabled. Directions verified on the bench (props off).
+- Accelerometer calibrated; orientation OK (AHRS_ORIENTATION 0, servo rail faces the rear). Compass (BeeID Pro M10, IST8310, connector toward the rear) calibrated; heading matches a phone compass.
+- Switches: ch5 RTL (RC5_OPTION 4), ch7 mode (FLTMODE_CH 7: Manual/FBWA/Auto), ch8 ArmDisarm (RC8_OPTION 153).
+- Parameter snapshots in `params/` (latest: cruza_params_2026-10-07_1835.params; QGC saves new ones to Documents\QGroundControl\Parameters).
+- Config pages in QGC need USB (the radio link does not download the full parameter list).
+
+## TODO (priority order)
+1. ESC/motor check with the propeller off, then set the ESC range if needed (SERVO4 min/max 1100/1900 now).
+2. Failsafes: RC loss, low battery, GPS loss; ARMING_RUDDER -> 0 so only ch8 arms.
+3. Verify the battery monitor against a multimeter (BATT_MONITOR 4, VOLT_MULT 11, AMP_PERVLT 40, CAPACITY 3300 look like defaults).
+4. Traffic pattern mission (Plan view) and a bench Auto test.
+5. LOW PRIORITY, parked: airspeed sensor. ARSPD_TYPE 1 (MS4525), ARSPD_BUS 1, ARSPD_DEVID 0 = sensor not detected; needs 5V/GND/SCL/SDA on I2C1 (PB6/PB7). Do not plug an I2C sensor into the CAN connector. ARSPD_USE stays 0 until it reads sensibly.
+
 ## History of the problem (kept for reference)
 - Backpack AP is the plain-named "ExpressLRS TX Backpack" (identifies as "RadioMaster Pocket 2.4GHz TX"), IP 10.0.0.1.
 - Status page: `http://10.0.0.1/mavlink` -> `enabled:false`, `gcs: "IP UNSET"`, listen 14555, send 14550.
