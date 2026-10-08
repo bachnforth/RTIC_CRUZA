@@ -35,6 +35,14 @@
 - `MAV2_PARAMS` = 2 on the ELRS port makes QGC's parameter download over ELRS usable (about 1 minute). ELRS packet rate 500 Hz doubles telemetry bandwidth at some range cost.
 - Battery failsafe actions on Plane: `BATT_FS_LOW_ACT`/`BATT_FS_CRT_ACT` = 1 is **RTL** on this firmware (Plane's list is not Copter's). Always use the names shown in QGC, not numbers.
 - **Remaining pre-arm failures:** "Check mag field (xy diff:181>100)" and "Gyros inconsistent". Plan: recalibrate compass outdoors away from metal; check whether the BeeID is tilted in its mount (classmate used a custom compass rotation with about 25 degrees pitch); reboot with the plane perfectly still for the gyros.
+- **Pre-flight diagnostic 2026-10-08 10:33/10:47 (params in `params/`):**
+  - Compass recalibrated; `COMPASS_ORIENT` changed from Roll180 to Pitch180 (a half-turn in yaw), scale factors uneven (0.94/0.99/0.91). **Redo the heading check against a phone compass.** `COMPASS_LEARN` is EKF-Learn (was Disabled): set back to Disabled. Is the BeeID tilted? Not yet answered.
+  - `ARMING_MAGTHRESH` raised to 300 (default 100) hides the mag-field check: set back to 100 and retest.
+  - `ARSPD_TYPE` set to None (no sensor), as of 10:47. Flying without airspeed: fly conservatively.
+  - Do **not** use Auto takeoff on the maiden (`TKOFF_THR_MINACC` is 0, no launch detection). Hand-launch in FBWA.
+  - Mission has 9 items (`MIS_TOTAL`), not yet reviewed. `WP_RADIUS` 90 m and `NAVL1_PERIOD` 17 are generous for a 1.2 m plane.
+  - Geofence is off; consider a 300 m circle / 100 m altitude fence with RTL.
+  - Confirm a microSD card is in the AIO (logging and terrain need it). RC-loss failsafe and ELRS range check still to be tested. CompassMot / heading under throttle not checked.
 - **Temporary / unsafe-for-flight settings to revert before flight:**
   - `ARMING_SKIPCHK` = 4104 (skips GPS lock and GPS configuration checks). Untick GPS lock now that there is a real fix.
   - `BATT_ARM_VOLT` = 13.2 (set back to 15.0 with a full pack).
