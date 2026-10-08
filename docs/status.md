@@ -11,16 +11,17 @@
   - Binding phrase used on the module and receiver builds (same on both): `PrairieKite-ELRS-7426`
 - Pocket settings: Link Mode = MAVLink (set with the receiver unpowered; ELRS refuses while linked), Backpack Telemetry = WiFi.
 
-## RESOLVED 2026-10-07: MAVLink over ELRS to QGC works (no USB)
-- The Pocket's backpack AP is **"ExpressLRS TX Backpack 217F95"** (password `expresslrs`), NOT the plain-named "ExpressLRS TX Backpack" network. The plain-named one belongs to a different radio (also reports "RadioMaster Pocket 2.4GHz TX"); do not join it or send it traffic. Test heartbeats were sent to it by mistake during diagnosis.
-- On 217F95 the laptop (Alfa card, "Wi-Fi 2") gets a DHCP lease (10.0.0.10x); the backpack reports `enabled:true`, `gcs` = laptop IP, packets_up and packets_down both climbing.
+## RESOLVED 2026-10-08: MAVLink over ELRS to QGC works (no USB)
+- The Pocket backpack now runs a custom 1.5.9 image with a fixed UID. Its stable AP is **"ExpressLRS TX Backpack 456B22"** (password `expresslrs`). Firmware and recovery instructions are in `firmware/` and `docs/elrs-backpack.md`.
+- The plain-named "ExpressLRS TX Backpack" network is firmware-update mode, not the normal MAVLink AP. `Backpack > Telemetry = WiFi` starts the MAVLink AP; do not use the separate "Enable Backpack WiFi" command for normal operation.
+- The laptop (Alfa card, "Wi-Fi 2") gets a DHCP lease in 10.0.0.0/24; the backpack reports `enabled:true` and learns the laptop's GCS IP from the first UDP datagram sent to port 14555.
 - QGC link: UDP, local port 14550, server address 10.0.0.1:14555. QGC shows the vehicle (Manual, battery %, RC, GPS) with the AIO on the flight battery and no USB.
 - Remaining check: mode switch (channel 7) follows in QGC over this link.
-- **The backpack's network name changed** (217F95 -> A3144A) and other ELRS radios are in range, so the saved Wi-Fi profile stopped matching and Windows left the Alfa adapter on 169.254.x.x. Do not trust a fixed SSID.
-- **Always run `tools/connect-backpack.ps1`** (normal PowerShell, no admin). It scans for "ExpressLRS TX Backpack *", asks which one is yours, saves a profile if needed, renews DHCP, and prints the backpack's counters.
-- **Always confirm the vehicle is yours before using QGC**: flip the channel 7 switch and watch the mode follow. Never arm or send commands until it does. To tell which network is yours, power the Pocket off/on and see which name disappears/returns (scan results can be stale: wait ~60 s).
+- The earlier stock image changed suffix (217F95 -> A3144A), which broke the saved Windows profile. The fixed-UID image was cold-boot tested: 456B22 returned and Windows reconnected automatically.
+- `tools/connect-backpack.ps1` now defaults to the fixed 456B22 AP, retains scan fallback, renews DHCP if necessary, and prints the backpack's counters.
+- **Always confirm the vehicle is yours before using QGC**: flip the channel 7 switch and watch the mode follow. Never arm or send commands until it does. The fixed 456B22 suffix identifies this Pocket, but the control check remains mandatory.
 - If no backpack network is visible: Pocket on and linked ("C"), Backpack > Telemetry toggled Off then WiFi, wait 20 s.
-- Idea not yet tested: put the backpack in station mode on the phone hotspot (2.4 GHz) so the name no longer matters; QGC would then use `elrs_txbp.local:14555`.
+- Station mode on a phone hotspot is no longer needed to stabilize the network name.
 
 ## Aircraft: Hee Wing T2 Cruza (conventional: ailerons, elevator, rudder; twin motors)
 - Servo outputs: S1 aileron (reversed), S4 throttle (ESC), S5 elevator (reversed), S6 rudder; S2/S3 disabled. Directions verified on the bench (props off).

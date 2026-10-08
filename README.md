@@ -19,6 +19,10 @@ Goal: fly a complete traffic pattern (takeoff, circuit, approach, landing) on a 
 2. UART budget: RX (ELRS/MAVLink), GPS, and airspeed (I2C) must all fit on the AIO's pads.
 3. Ground station radio: ELRS TX module/radio that bridges MAVLink to the PC/phone (e.g. Wi-Fi backpack or USB).
 
+The Pocket backpack is configured and verified. See `docs/elrs-backpack.md` for
+the fixed SSID, firmware recovery images, QGroundControl ports, and status-field
+behavior.
+
 ## Plan
 1. Confirm the FC firmware and wiring map -> `docs/wiring.md`
 2. Bench setup: flash FC, configure ELRS MAVLink, verify QGC connects -> `docs/elrs-mavlink.md`
