@@ -12,7 +12,11 @@ Goal: fly a complete traffic pattern (takeoff, circuit, approach, landing) on a 
 | TBS Lucid Wing AIO 2-6S 50A | FC + ESC (all-in-one) | Firmware target (ArduPilot vs PX4), UART map, ESC protocol |
 | BetaFPV ELRS 2.4G diversity RX | RC + MAVLink link | ELRS firmware version, UART/baud, MAVLink mode |
 | Mateksys ASPD-4525 | Digital airspeed | Bus (I2C), pitot orientation/calibration |
-| NewBeeDrone BeeID Pro M10 | GPS (with ID module) | Protocol (UBX/NMEA), UART, compass included? |
+| Mateksys M10Q-5883 | GPS replacement | Installed 2026-10-08, replacing NewBeeDrone BeeID Pro M10; post-swap wiring, configuration, and calibration pending verification |
+
+The current GPS is the **Mateksys M10Q-5883**. See `docs/status.md` for the
+replacement record. Existing parameter snapshots and BeeID test results predate
+the swap; a post-swap parameter export has not yet been recorded.
 
 ## Open decisions
 1. Flight firmware: ArduPilot (Plane) is the usual choice for traffic patterns and landing sequences; confirm the AIO supports it.

@@ -1,4 +1,9 @@
-# Build status — 2026-10-07
+# Build status — 2026-10-08
+
+## Current GPS hardware — updated 2026-10-08
+- Replaced the NewBeeDrone BeeID Pro M10 with a **Mateksys M10Q-5883** (owner-confirmed hardware swap).
+- Post-swap wiring, GPS configuration, compass detection/orientation/calibration, and GPS fix/health results have not yet been recorded.
+- Existing `params/` snapshots are retained as pre-swap records; no post-swap parameter export is available yet. The BeeID settings and calibration results below describe the previous hardware and are not a verified M10Q-5883 configuration.
 
 ## Done
 - AIO (TBS Lucid Wing AIO) flashed with ArduPilot Plane stable, target `TBS_LUCID_H7_WING_AIO` (via STM32 DFU + with_bl hex; QGC could not enter the bootloader). Files in `firmware/`.
@@ -25,14 +30,14 @@
 
 ## Aircraft: Hee Wing T2 Cruza (conventional: ailerons, elevator, rudder; twin motors)
 - Servo outputs: S1 aileron (reversed), S4 throttle (ESC), S5 elevator (reversed), S6 rudder; S2/S3 disabled. Directions verified on the bench (props off).
-- Accelerometer calibrated; orientation OK (AHRS_ORIENTATION 0, servo rail faces the rear). Compass (BeeID Pro M10, IST8310, connector toward the rear) calibrated; heading matches a phone compass.
+- Accelerometer calibrated; orientation OK (AHRS_ORIENTATION 0, servo rail faces the rear). Previous compass (BeeID Pro M10, IST8310, connector toward the rear) was calibrated and its heading matched a phone compass; replacement sensor verification is pending as noted above.
 - Switches: ch5 RTL (RC5_OPTION 4), ch7 mode (FLTMODE_CH 7: Manual/FBWA/Auto), ch8 ArmDisarm (RC8_OPTION 153).
 - Parameter snapshots in `params/` (latest: cruza_params_2026-10-07_1835.params; QGC saves new ones to Documents\QGroundControl\Parameters).
 - Config pages in QGC need USB (the radio link does not download the full parameter list).
 
-## Status 2026-10-08 (morning, field test with phone QGC over USB)
+## Historical status 2026-10-08 (morning, BeeID field test with phone QGC over USB, before GPS swap)
 - **GPS works** (BeeID Pro M10): fix_type DGPS, 21 satellites, HDOP ~1.2, EKF3 origin set, terrain loaded. Settings that fixed detection (from a classmate with the same hardware): `GPS1_TYPE` u-blox, `GPS_AUTO_CONFIG` disabled, `SERIAL6_BAUD` 115200, `GPS1_RATE_MS` 100, `SERIAL6_OPTIONS` none. A TX/RX swap was tried and was not needed.
-- Classmate warns the BeeID relays GPS at ~9.1 Hz, which can make ArduPilot flag the GPS as lagged/unhealthy later; their fallback is a separate GPS (Matek M10Q-5883). Not verified on our aircraft; watch for "GPS unhealthy/lagged" messages.
+- Classmate warned the BeeID relays GPS at ~9.1 Hz, which can make ArduPilot flag the GPS as lagged/unhealthy later; their fallback was a separate GPS (Matek M10Q-5883). Our aircraft now has that replacement model installed; post-swap GPS health results have not yet been recorded.
 - `MAV2_PARAMS` = 2 on the ELRS port makes QGC's parameter download over ELRS usable (about 1 minute). ELRS packet rate 500 Hz doubles telemetry bandwidth at some range cost.
 - Battery failsafe actions on Plane: `BATT_FS_LOW_ACT`/`BATT_FS_CRT_ACT` = 1 is **RTL** on this firmware (Plane's list is not Copter's). Always use the names shown in QGC, not numbers.
 - **Remaining pre-arm failures:** "Check mag field (xy diff:181>100)" and "Gyros inconsistent". Plan: recalibrate compass outdoors away from metal; check whether the BeeID is tilted in its mount (classmate used a custom compass rotation with about 25 degrees pitch); reboot with the plane perfectly still for the gyros.
