@@ -1,5 +1,11 @@
 # Build status — 2026-10-08
 
+## Airspeed sensor newly connected — 2026-10-09
+
+- Owner reports installing an airspeed sensor and connecting it to the AIO after the second AUTO flight. Sensor model, bus wiring, detection, and calibration have not yet been verified.
+- Read-only live USB check after installation confirms ARSPD_TYPE=0 and ARSPD_USE=0. The sensor driver remains disabled, so a physical connection alone does not provide measured airspeed records. Existing airspeed estimates must not be presented as readings from the new sensor.
+- No vehicle parameters were changed during this check. Configure the correct sensor type/bus and verify/calibrate readings before using sensor data for flight control. ARSPD_USE=0 does not by itself guarantee complete isolation from flight control: a configured healthy sensor may still be used for speed scaling, as described in [ArduPilot's airspeed parameter documentation](https://ardupilot.org/plane/docs/airspeed-parameters-setup.html).
+
 ## Second AUTO flight reviewed — 2026-10-09
 
 - Owner reports the same method/equipment/conditions and that everything worked well. Log 12 confirms AUTO takeoff, circuit, NAV_LAND/flare, and disarm. [Second-flight report and comparison](flight-review-2026-10-09-second-flight.md).
