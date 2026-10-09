@@ -1,5 +1,14 @@
 # Build status — 2026-10-08
 
+## Current flight-control corrections — updated 2026-10-09
+
+- Failed launch on 2026-10-08: owner reports an immediate nose dive in AUTO with motors running. Bench investigation found swapped attitude axes and reversed elevator stabilization.
+- Confirmed owner-applied settings: **AHRS_ORIENTATION=6 (Yaw270)**, **SERVO5_REVERSED=0 (Normal)**, **RC2_REVERSED=1 (Reversed)**. The AIO is mounted upright across the fuselage.
+- Nose-down ATTITUDE now reports negative pitch with roll near zero. Owner confirms FBWA nose down -> elevator UP; nose up -> elevator DOWN; right wing down -> right aileron DOWN/left UP. Pull-back now moves elevator UP.
+- Recalibration, final attitude/control checks in both directions, final stick checks in FBWA and MANUAL, crash inspection, CG check, and a controlled FBWA checkout remain pending. These bench corrections have not been flight-validated.
+- Existing full parameter snapshots predate these changes. Save a new export; do not treat the historical orientation/reversal notes below as the current setup.
+- Details and remaining checks: [launch investigation](launch-investigation-2026-10-08.md).
+
 ## Current GPS hardware — updated 2026-10-08
 - Replaced the NewBeeDrone BeeID Pro M10 with a **Mateksys M10Q-5883** (owner-confirmed hardware swap).
 - Post-swap wiring, GPS configuration, compass detection/orientation/calibration, and GPS fix/health results have not yet been recorded.
