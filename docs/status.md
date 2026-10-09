@@ -1,5 +1,16 @@
 # Build status — 2026-10-08
 
+## AUTO test flight and log review — updated 2026-10-09
+
+**ESC endpoint calibration and normal startup check completed:** Both props removed and USB-only preparation confirmed by owner. Owner armed in MANUAL; telemetry verified 1100 µs at low stick and steady 1900 µs at full stick before ESC power-up. Owner reports two distinct "Di Di" confirmation sounds after lowering throttle, consistent with both original ESCs accepting the endpoints. After battery monitor restoration and normal ESC power-up, owner confirmed both motors started and ran smoothly. Final telemetry confirms disarmed MANUAL and 1100 µs throttle. Temporary battery changes were all restored, controller rebooted, and values read back: BATT_MONITOR=4, BATT_ARM_VOLT≈13.2, BATT_FS_LOW_ACT=1, BATT_FS_CRT_ACT=1. No temporary calibration overrides remain; the historical 13.2 V arming threshold is still pending the separate review noted below. Cruise trim remains 54. Saved complete controller export to `params/cruza_params_2026-10-09_post_esc_calibration.params`. ESC memory was not read directly; increased physical thrust and flight improvement remain unverified. Motors were controlled by the owner; no remote arming or motor-output commands were sent.
+
+- Retrieved the three newest onboard logs over USB; log 9 contains the AUTO takeoff, circuit at approximately 60 m, and NAV_LAND/automatic disarm. Saved logs, plots, parameter snapshots, and findings in [flight review](flight-review-2026-10-09.md).
+- Fresh USB settings confirm AHRS_ORIENTATION=6, SERVO5_REVERSED=0, RC2_REVERSED=1. This test supplies flight evidence after the earlier bench corrections; the older pending checklist below is retained as history and does not establish which individual checks the owner completed.
+- Owner reported weak takeoff and requested roughly 20% more cruise thrust. Takeoff already used 100% throttle / 1900 µs before release and throughout the climb. More physical takeoff power requires verifying ESC endpoints and propulsion hardware; takeoff parameters were not changed.
+- Applied TRIM_THROTTLE 45 → 54 (20% relative increase in cruise trim), verified by independent MAVLink readback while the aircraft was disarmed. New setting has not been flight-tested. Before/after exports are in `params/`.
+- Current monitoring is implausible (~0.2 A throughout flight); verify the sensor connection/configuration/calibration. Airspeed sensor remains disabled. Temporary arming settings still need review.
+- Owner confirms 4S / 14.8 V battery and stock kit motors/propellers/original aircraft ESCs. The original ESCs receive throttle control from the AIO; its built-in ESC is not driving both motors. ESC endpoint calibration history is unknown. Check endpoint calibration with props removed; manufacturer documentation specifies 6S for the stock propulsion setup, so the confirmed 4S pack is a potential contributor to weak takeoff power.
+
 ## Current flight-control corrections — updated 2026-10-09
 
 - Failed launch on 2026-10-08: owner reports an immediate nose dive in AUTO with motors running. Bench investigation found swapped attitude axes and reversed elevator stabilization.

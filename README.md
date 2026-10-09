@@ -36,6 +36,11 @@ behavior.
 6. Ground tests: failsafes, control surface checks, motor direction
 7. First flight, then log review in `logs/`
 
+The 2026-10-09 AUTO flight, cruise-throttle change, and ESC calibration are recorded
+in [the flight review](docs/flight-review-2026-10-09.md). Follow the
+[flight-log workflow](docs/flight-log-workflow.md) to retrieve the next flight and
+compare it against the retained baseline.
+
 ## Layout
 - `docs/` build notes, wiring, config steps
 - `params/` parameter files

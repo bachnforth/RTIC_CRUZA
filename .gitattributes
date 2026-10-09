@@ -1,1 +1,3 @@
 firmware/** -text
+logs/**/*.BIN -text
+logs/**/*.png -text
