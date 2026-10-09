@@ -1,5 +1,13 @@
 # Build status — 2026-10-08
 
+## Second AUTO flight reviewed — 2026-10-09
+
+- Owner reports the same method/equipment/conditions and that everything worked well. Log 12 confirms AUTO takeoff, circuit, NAV_LAND/flare, and disarm. [Second-flight report and comparison](flight-review-2026-10-09-second-flight.md).
+- First reaching 60 m after the GPS movement marker improved from 18.34 s to 14.26 s (~22% sooner); the earlier initial height dip was absent in new samples. Full takeoff output remained 100% / 1900 µs in both flights.
+- On the same long cruise leg, median groundspeed increased 10.93 → 14.30 m/s and median throttle fell 58.94% → 50.03%. Pitch tracking improved and straight-leg roll tracking was similar. Broader cruise/turn roll error increased; no gains were changed.
+- LAND target moved 35.8 m. Final recorded distance to the new target was 3.70 m, so the landing distances are not directly comparable against an identical target. Log 12 records disarm, but not an automatic-disarm message.
+- Retain TRIM_THROTTLE=54, existing gains, and calibrated 1100–1900 µs endpoints as the new baseline. No vehicle settings were changed during this log review. Sensor/current-monitor and historical arming-setting review items remain as documented below.
+
 ## AUTO test flight and log review — updated 2026-10-09
 
 **ESC endpoint calibration and normal startup check completed:** Both props removed and USB-only preparation confirmed by owner. Owner armed in MANUAL; telemetry verified 1100 µs at low stick and steady 1900 µs at full stick before ESC power-up. Owner reports two distinct "Di Di" confirmation sounds after lowering throttle, consistent with both original ESCs accepting the endpoints. After battery monitor restoration and normal ESC power-up, owner confirmed both motors started and ran smoothly. Final telemetry confirms disarmed MANUAL and 1100 µs throttle. Temporary battery changes were all restored, controller rebooted, and values read back: BATT_MONITOR=4, BATT_ARM_VOLT≈13.2, BATT_FS_LOW_ACT=1, BATT_FS_CRT_ACT=1. No temporary calibration overrides remain; the historical 13.2 V arming threshold is still pending the separate review noted below. Cruise trim remains 54. Saved complete controller export to `params/cruza_params_2026-10-09_post_esc_calibration.params`. ESC memory was not read directly; increased physical thrust and flight improvement remain unverified. Motors were controlled by the owner; no remote arming or motor-output commands were sent.

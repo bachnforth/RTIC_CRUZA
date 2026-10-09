@@ -42,7 +42,8 @@ line(axes[4],'BAT','Volt','Voltage');line(axes[4],'BAT','Curr','Current')
 for ax in axes:
     for r in rows['MODE']:
         t=r['TimeUS']/1e6-base;ax.axvline(t,color='gray',alpha=.3)
-    ax.legend(loc='upper right');ax.grid(alpha=.2)
+    if ax.get_legend_handles_labels()[0]:ax.legend(loc='upper right')
+    ax.grid(alpha=.2)
 for ax,label in zip(axes,['Degrees','Degrees','Microseconds','m/s and m','V and A']):ax.set_ylabel(label)
 axes[-1].set_xlabel('Seconds from first logged record')
 fig.suptitle(path.name+' — flight controls and propulsion');fig.tight_layout()

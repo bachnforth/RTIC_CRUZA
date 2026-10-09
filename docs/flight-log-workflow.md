@@ -27,6 +27,15 @@ The analyzer generates a plot, summary, and full parsed records beside each BIN.
 
 Use `logs/2026-10-09/log_00009.BIN` as the first successful AUTO circuit baseline, with findings in `docs/flight-review-2026-10-09.md`. The next flight differs in two recorded ways: TRIM_THROTTLE increased from 45 to 54, and both original ESCs underwent 1100–1900 µs endpoint calibration followed by an owner-confirmed smooth props-off startup test. Controller parameters after restoration and reboot are in `params/cruza_params_2026-10-09_post_esc_calibration.params`.
 
+The subsequent test is log 12 in `logs/2026-10-09/download-110522_067346/`; see `docs/flight-review-2026-10-09-second-flight.md`. Use it as the baseline for future tests with trim 54 and calibrated ESCs, retaining log 9 for the original comparison. Generate comparisons and plots after analyzing both logs:
+
+```powershell
+python tools/compare-flight-logs.py <baseline.BIN> <new-flight.BIN> <comparison.json>
+python tools/plot-flight-comparison.py <comparison.json>
+```
+
+The comparison tool expects completed AUTO takeoff and mission-5/mission-6 messages in both logs. For a different mission or flight mode, select and analyze suitable phases explicitly instead of using that assumption.
+
 The next report should compare launch acceleration/initial height loss, time to the mission takeoff altitude, throttle output, altitude tracking, groundspeed, pitch/roll demand versus response, GPS/estimator/vibration health, and approach/landing behavior. Identify the actual airborne log rather than assuming the newest log is the flight. Separate takeoff, level cruise, turns, descent, and ground activity. Confirm any parameter differences using the flight's PARM records and a new live snapshot.
 
 The confirmed battery is 4S / 14.8 V; the kit motors, props, and original external ESCs are retained. Manufacturer stock propulsion documentation recommends 6S, but increased voltage has not been prescribed or tested on this modified build. There is no enabled airspeed sensor: GPS groundspeed must not be presented as measured airspeed. The low current readings may represent only electronics if external ESC power bypasses the AIO's sensor; do not derive propulsion power or useful battery capacity from them until wiring is verified.
