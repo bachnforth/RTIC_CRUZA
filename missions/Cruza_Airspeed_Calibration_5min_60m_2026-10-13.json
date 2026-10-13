@@ -1,0 +1,27 @@
+{
+  "source_log": "C:\\Users\\ebach\\Documents\\ChatGPT\\Fixed wing Cruza\\logs\\2026-10-13\\download-102304_471623\\log_00014.records.json",
+  "qgc_plan": "C:\\Users\\ebach\\Documents\\QGroundControl\\Missions\\Cruza_Airspeed_Calibration_5min_60m_2026-10-13.plan",
+  "workspace_plan": "C:\\Users\\ebach\\Documents\\ChatGPT\\Fixed wing Cruza\\missions\\Cruza_Airspeed_Calibration_5min_60m_2026-10-13.plan",
+  "items": 10,
+  "loiter_sequence": 6,
+  "loiter_command": 19,
+  "loiter_seconds": 300,
+  "loiter_center_lat_lon": [
+    33.7244733115942,
+    -85.91135246262625
+  ],
+  "nominal_radius_m": 60,
+  "relative_altitude_m": 60,
+  "required_parameters": {
+    "ARSPD_AUTOCAL": 1,
+    "ARSPD_USE": 0,
+    "ARSPD_SKIP_CAL": 0,
+    "WP_LOITER_RAD": 60
+  },
+  "estimated_total_flight_minutes": [
+    7,
+    8
+  ],
+  "nominal_circle_inside_previous_waypoint_outline": true,
+  "notes": "Outline is not a surveyed boundary or fence. Plane timed loiter uses WP_LOITER_RAD; command radius magnitude is ignored. File created only; not loaded into QGC or uploaded."
+}

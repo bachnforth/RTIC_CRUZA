@@ -1,5 +1,45 @@
 # Build status — 2026-10-08
 
+## Calibration confirmation reviewed — 2026-10-13, log 16
+
+- [Confirmation-flight review](flight-review-2026-10-13-calibration-confirmation.md). Full 300-second loiter completed; flight lasted 7 min 41 s from arm to disarm.
+- Starting ratio 1.725592; saved update **1.817026**. Final working estimate about **1.853**, with last loiter minute range 1.8525–1.8796 and only 0.10% net change. This is materially more settled than log 15.
+- Recommend explicitly saving **RATIO=1.85**, **AUTOCAL=0**, then a controlled **USE=1** speed-control checkout. These recommendations were **not applied**; live postflight AUTOCAL=1, USE=0, RATIO=1.81702554.
+- Sensor healthy throughout; no ERR, EKF fault/GPS flags, sensor dropouts, or logger drops. Six clips per IMU at landing stop, none before flare. Propulsion-current measurement remains invalid (~0.19 A); minimum speed and historical arming settings remain separate review items.
+- Snapshot: `params/cruza_params_2026-10-13_112145_796901_postflight.params`; BIN/metrics in `logs/2026-10-13/download-112145_796901/`.
+
+## Full five-minute calibration flight reviewed — 2026-10-13, log 15
+
+- [Five-minute flight review](flight-review-2026-10-13-five-minute-calibration.md). Timed 300-second loiter completed; approximately 12 clockwise circles. Flight lasted 7 min 32 s from arm to disarm.
+- Automatic calibration saved RATIO 2.00 → 1.904373 → 1.812128 → **1.725592**. Live post-reconnect RATIO=1.72559154 confirms persistence; supersedes the previous ratio=2 baseline.
+- Final working ratio about 1.723, but it still fell approximately 2.6% during the last loiter minute. Retain 1.7256 as baseline and confirm stability in another turning flight before USE=1. AUTOCAL remains 1 and USE remains 0; no parameters changed during retrieval/review.
+- All 4663 airspeed samples healthy, no dropouts, EKF fault/GPS flags, ERR records, accelerometer clipping, or logger drops. Settled-loiter altitude 57.85–62.50 m; median final-minute airspeed 15.06 m/s. Current monitor remains invalid (~0.20 A).
+- Uploaded loiter center differs from generated preview (~73 m west); recorded center 33.7245032, -85.9121447. Actual orbit radius median 61.22 m.
+- Full snapshot: `params/cruza_params_2026-10-13_105658_277326_postflight.params`; BIN/metrics in `logs/2026-10-13/download-105658_277326/`.
+
+## Five-minute calibration mission prepared — 2026-10-13
+
+- Created QGC plan `Cruza_Airspeed_Calibration_5min_60m_2026-10-13.plan` in `missions/` and the normal QGroundControl Missions folder. [Mission details](calibration-mission-2026-10-13.md).
+- Uses log 14's latest flown takeoff/circuit/landing with a new 300-second timed loiter at 60 m before the approach. Nominal 60 m radius uses existing WP_LOITER_RAD=60. Estimated total flight 7–8 minutes.
+- File/command checks and preview completed. Not loaded in QGC, uploaded, or flight-tested. No vehicle settings were changed. Keep AUTOCAL=1, USE=0 for calibration; export the ratio before power cycling afterward.
+
+## Airspeed calibration attempt reviewed — 2026-10-13, log 14
+
+- [Calibration-flight report](flight-review-2026-10-13-calibration.md). AUTO circuit lasted approximately two minutes; recommended five-minute repeated-turn calibration remains incomplete.
+- Flight settings confirm AUTOCAL=1, USE=0, initial RATIO=2, CRUISE=15, MIN=10, MAX=22. All 1399 airspeed samples healthy, no dropouts or EKF fault/GPS flags.
+- Working ratio reconstructed from speed/pressure changed 2.00 → about 1.9295, still changing at flight end. No saved ratio/reset event; change is below the firmware's roughly 5% persistence threshold. Live post-reconnect RATIO remains 2. Do not treat 1.93 as a confirmed final ratio or enable USE yet.
+- Landing-stop shock produced 29/31 accelerometer clips; none before landing. Battery current remains implausible (~0.20 A). No aircraft parameters were changed.
+- Full snapshot: `params/cruza_params_2026-10-13_102304_471623_postflight.params`; BIN/metrics in `logs/2026-10-13/download-102304_471623/`.
+
+## Airspeed integration flight reviewed — 2026-10-13
+
+- Retrieved log 13 and complete live parameter snapshot over USB while disarmed. [Airspeed flight review](flight-review-2026-10-13-airspeed.md).
+- MS4525 now detected: ARSPD_TYPE=1, ARSPD_BUS=1, ARSPD_DEVID=141321. All 1464 logged airspeed samples healthy, no dropouts; median cruise reading 17.16 m/s. This supersedes the disabled/unverified sensor status below.
+- ARSPD_USE=0, ARSPD_AUTOCAL=0, ARSPD_RATIO=2 throughout the flight. Measurement works, but scale calibration and measured-air-speed automatic throttle control are not verified. Dedicated calibration flight remains next; do not treat this as completed automatic speed-control integration.
+- AUTO takeoff/circuit/NAV_LAND/flare/disarm recorded; no ERR records, EKF fault/GPS flags, accelerometer clipping, or logger drops. Cruise altitude 58.11–60.93 m around 60 m target. Brief steep commanded pitch on landing entry warrants review if abrupt descent/porpoising was observed.
+- Propulsion current still implausible (0.178–0.191 A). Historical ARMING_MAGTHRESH=300, ARMING_SKIPCHK=4096, and BATT_ARM_VOLT≈13.2 persist. No aircraft settings were changed during retrieval/review.
+- New complete snapshot: `params/cruza_params_2026-10-13_095339_683885_postflight.params`; BIN and metrics in `logs/2026-10-13/download-095339_683885/`.
+
 ## Airspeed sensor newly connected — 2026-10-09
 
 - Owner reports installing an airspeed sensor and connecting it to the AIO after the second AUTO flight. Sensor model, bus wiring, detection, and calibration have not yet been verified.

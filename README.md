@@ -15,8 +15,19 @@ Goal: fly a complete traffic pattern (takeoff, circuit, approach, landing) on a 
 | Mateksys M10Q-5883 | GPS replacement | Installed 2026-10-08, replacing NewBeeDrone BeeID Pro M10; post-swap wiring, configuration, and calibration pending verification |
 
 The current GPS is the **Mateksys M10Q-5883**. See `docs/status.md` for the
-replacement record. Existing parameter snapshots and BeeID test results predate
-the swap; a post-swap parameter export has not yet been recorded.
+replacement record. Historical BeeID snapshots predate the swap; fresh October 9
+and October 13 exports and flight reviews are now available. GPS performance was
+checked in those flights; consult the current status for remaining sensor checks.
+
+## Airspeed integration — 2026-10-13
+
+The Matek ASPD-4525 is detected on I2C bus 1 and verified in flight. Two full
+five-minute calibration orbits produced a settled working ratio near 1.85.
+Recommended next settings are **ARSPD_RATIO=1.85, ARSPD_AUTOCAL=0, ARSPD_USE=1**
+for a controlled AUTO speed-control checkout; **these changes have not been
+applied or flight-validated**. The latest actual snapshot still has ratio 1.8170,
+AUTOCAL=1 and USE=0. See [main takeaways](docs/airspeed-integration-summary.md)
+for evidence, the calibration mission, and remaining issues.
 
 ## Open decisions
 1. Flight firmware: ArduPilot (Plane) is the usual choice for traffic patterns and landing sequences; confirm the AIO supports it.

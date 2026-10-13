@@ -1,0 +1,61 @@
+{
+  "mavpackettype": "AUTOPILOT_VERSION",
+  "capabilities": 62319,
+  "flight_sw_version": 67568127,
+  "middleware_sw_version": 0,
+  "os_sw_version": 0,
+  "board_version": 344326144,
+  "flight_custom_version": [
+    100,
+    98,
+    101,
+    55,
+    57,
+    50,
+    49,
+    54
+  ],
+  "middleware_custom_version": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "os_custom_version": [
+    100,
+    49,
+    48,
+    51,
+    57,
+    56,
+    51,
+    102
+  ],
+  "vendor_id": 4617,
+  "product_id": 22336,
+  "uid": 0,
+  "uid2": [
+    56,
+    0,
+    24,
+    0,
+    2,
+    81,
+    51,
+    53,
+    48,
+    52,
+    52,
+    50,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ]
+}

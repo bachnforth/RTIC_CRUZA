@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 path=Path(sys.argv[1]); c=mavutil.mavlink_connection(str(path))
 rows=collections.defaultdict(list); counts=collections.Counter(); params={}
-wanted={'MSG','MODE','EV','ERR','ARM','ATT','RATE','RCOU','RCIN','BAT','GPS','POS','CTUN','NTUN','TECS','PIDP','PIDR','VIBE','XKF4','CMD'}
+wanted={'MSG','MODE','EV','ERR','ARM','ATT','RATE','RCOU','RCIN','BAT','GPS','POS','CTUN','NTUN','TECS','PIDP','PIDR','VIBE','XKF4','XKF2','XKF3','CMD','ARSP','ASP2','DSF'}
 while True:
     m=c.recv_match()
     if m is None:break
@@ -21,7 +21,7 @@ while True:
 summary={'file':str(path),'counts':dict(counts),'parameters':params}
 for typ in ('MSG','MODE','EV','ERR','ARM','CMD'):
     summary[typ]=rows[typ]
-for typ in ('ATT','RCOU','RCIN','BAT','GPS','POS','CTUN','RATE','VIBE'):
+for typ in ('ATT','RCOU','RCIN','BAT','GPS','POS','CTUN','RATE','VIBE','ARSP','ASP2','TECS','XKF4','DSF'):
     summary[typ+'_ranges']={}
     if not rows[typ]:continue
     for k in rows[typ][0]:
