@@ -2,8 +2,12 @@
 
 Software is installed on the Pi. LTE internet, Headscale access through cellular
 NAT and one session-recovery test are verified. Pi UART configuration and
-monitoring are verified after reboot; AIO data reception and Android QGC video
+monitoring are verified after reboot. Bidirectional AIO UART is verified after
+the ground connection was moved to physical pin 6; Android QGC routing/video
 reception remain incomplete.
+Continue from the [QGC/LTE handover](../docs/qgc-lte-handover-2026-10-14.md):
+installation and hardware setup below are already complete on TFWCRUZA;
+router activation and Android acceptance tests are next.
 This is not an accepted flight system. See the
 [initial audit](../docs/pi-companion-audit-2026-10-14.md). Commands below run on
 the Pi unless identified as laptop/Android steps. No script issues aircraft
@@ -23,9 +27,10 @@ flowchart LR
 
 ## Deployment sequence
 
-1. Confirm HAT USB data and power wiring with the owner. The audit saw only a
-   USB root hub. Plugging the Pi into PWR IN does not provide the modem data path.
-   `lsusb` must show the modem; `mmcli -L` must detect it after installation.
+1. Confirm HAT USB data and power wiring with the owner. The initial audit saw
+   only a USB root hub; the modem is now detected through the HAT(B) USB pogo
+   connection after removing the Pi-data-port-to-HAT-USB1 cable.
+   `lsusb` must show the modem; `mmcli -L` must detect it.
 2. Owner enters sudo password locally to start installation independently of SSH:
    `sudo systemd-run --unit=cruza-install --collect /bin/bash /home/ebach/companion/install.sh`.
    Follow progress with `journalctl -fu cruza-install`; Ctrl+C stops only the
@@ -156,8 +161,8 @@ props removed and a separate test session are required for those tests.
 
 | Operation | Prerequisites / expected evidence | Current status |
 |---|---|---|
-| Heartbeat, GPS/map, battery/mode | AIO MAVLink and router active; QGC inspector and vehicle display | Blocked by UART/VPN setup |
-| Parameter read | Matching system ID, completed download; no writes | Not verified |
+| Heartbeat, GPS/map, battery/mode | AIO MAVLink and router active; QGC inspector and vehicle display | UART telemetry verified; Android router activation pending |
+| Parameter read | Matching system ID, completed download; no writes | UART read reply verified; Android full download pending |
 | Mission download | QGC request/list/items/ack, match saved mission | Not verified |
 | Mission upload | Owner selects reviewed plan, mission ACK accepted, download comparison | Not verified |
 | Arm/disarm | Owner-approved props-off bench; normal pre-arm validation and COMMAND_ACK | Not verified |
@@ -174,13 +179,13 @@ Acceptance status:
 | Camera H264 capture | Verified five-second file, not live Android stream |
 | LTE internet on Pi | Verified: QMI session, LTE-bound ping/DNS/HTTPS passed |
 | VPN through cellular NAT / Android endpoints | Verified reachability: private SSH and phone probe with Pi Wi-Fi disconnected; QGC endpoints still need app validation |
-| Heartbeats, GPS, bidirectional commands, missions | Blocked: Pi UART ready; live FC settings/VPN/routing pending |
+| Heartbeats, GPS, bidirectional commands, missions | Partially verified: valid UART telemetry and read-only parameter reply; Android routing and mission/action commands pending |
 | Video inside Android QGC | Not verified |
 | Combined CPU/RAM/power load | Not verified; short camera test has no throttling flag |
 | Configurable video bitrate | Partially verified: files/config and rpicam test; profiles not streamed |
 | Boot startup / individual recovery / LTE outage | Partially verified: network/monitoring services restart; NM recovered one bearer disconnect; LTE cold boot, prolonged outages and router/video recovery remain pending |
-| Usage measurement | Partially verified in counter logic tests; live LTE interface pending |
-| Existing RC/failsafes preserved | Partially verified: no FC changes; new path bench test pending |
+| Usage measurement | Counter logic tests and live wwan0 counters verified; estimates differ from carrier billing |
+| Existing RC/failsafes preserved | Only UART2 protocol/baud changed with full comparison; new path bench test pending |
 | No automatic arming/replay | Verified by source: no flight-command sender; end-to-end reconnect pending |
 | LTE loss does not destabilize aircraft | Not verified in combined test; FC remains independent by architecture |
 | Safety changes require approval | Existing settings untouched; no safety writes in installer |

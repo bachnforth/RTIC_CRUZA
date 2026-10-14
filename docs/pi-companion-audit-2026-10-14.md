@@ -248,6 +248,26 @@ unlimited retries confirmed. Longer radio/coverage outages remain untested.
 Live usage samples persist and no throttling flags appeared. Details and
 small-sample timing limitations are in docs/lte-integration.md.
 
+## Bidirectional AIO UART verified after ground correction
+
+Owner moved ground leads from a Pi underside pad to physical header pin 6.
+Pi then received 21,249 bytes in eight seconds. An independent 21,274-byte
+capture parsed into 665 checksum-valid MAVLink frames from system/component
+1/1, including eight ArduPlane heartbeats (base_mode 89: disarmed), attitude,
+GPS, battery, RC and mission-state messages.
+
+First source 254/191 parameter query had no observed reply. Repeated with a
+standard GCS heartbeat from 255/190 and two read-only PARAM_REQUEST_READ messages:
+85 application bytes sent, 25,146 received, and valid PARAM_VALUE for
+SERIAL2_PROTOCOL=2 returned. This verifies Pi-to-AIO reception as well as
+AIO-to-Pi telemetry. No parameter writes or vehicle action commands were sent.
+Inspection utility validates frame CRCs offline; passive/optional read-only
+probe is manual and is not an autostart command generator.
+
+Evidence: logs/2026-10-14/pi-uart-received.bin,
+pi-uart-param-reply.bin and pi-uart-param-reply-validation.json.
+Android routing and QGC end-to-end functionality still require activation/tests.
+
 ## References
 
 - [AI Camera support](https://www.raspberrypi.com/documentation/accessories/ai-camera.html)

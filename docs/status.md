@@ -1,5 +1,13 @@
 # Build status — 2026-10-08
 
+## QGC over LTE continuation — 2026-10-14
+
+- [Handover for the next chat](qgc-lte-handover-2026-10-14.md) records verified
+  UART/LTE/Headscale state, access, wiring, and the remaining Android QGC tests.
+- Next: activate phone-only MAVLink routing; verify QGC telemetry, parameter
+  reads and video, then repeat with Pi Wi-Fi disconnected and timed restoration.
+  Pi remains powered; no flight action tests were performed.
+
 ## Pi companion UART configured — 2026-10-14
 
 - USB on COM17 verified disarmed ArduPlane system/component 1/1. Complete live
@@ -10,8 +18,11 @@
   safety settings were preserved. No arming, motor or reboot command was sent.
 - Snapshots: `params/cruza_params_2026-10-14_181011Z_before_pi_uart.params` and
   `params/cruza_params_2026-10-14_181011Z_after_pi_uart.params`.
-- Pi UART/MAVLink heartbeat verification remains pending AIO restart/wiring
-  validation. See [Pi companion audit](pi-companion-audit-2026-10-14.md).
+- After owner moved AIO ground wires to Pi physical pin 6, an eight-second
+  sample contains 665 valid MAVLink frames and eight disarmed ArduPlane
+  heartbeats. A subsequent GCS heartbeat/read-only parameter query returned
+  SERIAL2_PROTOCOL=2, confirming both directions. Routing to Android/QGC
+  remains pending activation. See [Pi companion audit](pi-companion-audit-2026-10-14.md).
 
 ## Calibration confirmation reviewed — 2026-10-13, log 16
 
