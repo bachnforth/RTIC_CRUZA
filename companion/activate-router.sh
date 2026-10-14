@@ -11,10 +11,13 @@ from cruza import config, tail_ip
 c = config('/etc/cruza/config.json')
 peer = tail_ip(c['android_ip'])
 port = c['mavlink_port']
-print('table inet cruza { chain input { type filter hook input priority -10; policy accept;')
+print('table inet cruza {')
+print('chain input {')
+print('type filter hook input priority -10; policy accept;')
 print(f'udp dport {port} iifname "tailscale0" ip saddr {peer} accept')
 print(f'udp dport {port} drop')
-print('} }')
+print('}')
+print('}')
 PY
 nft --check --file /run/cruza-firewall.nft
 # Initial activation only: refuse to replace an existing policy without review.

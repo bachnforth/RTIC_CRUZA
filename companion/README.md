@@ -3,11 +3,11 @@
 Software is installed on the Pi. LTE internet, Headscale access through cellular
 NAT and one session-recovery test are verified. Pi UART configuration and
 monitoring are verified after reboot. Bidirectional AIO UART is verified after
-the ground connection was moved to physical pin 6; Android QGC routing/video
-reception remain incomplete.
-Continue from the [QGC/LTE handover](../docs/qgc-lte-handover-2026-10-14.md):
-installation and hardware setup below are already complete on TFWCRUZA;
-router activation and Android acceptance tests are next.
+the ground connection was moved to physical pin 6. Phone-only routing is active;
+Android QGC 5.0.8 connects and the owner confirmed its parameter download completed.
+Video reception and QGC with Pi Wi-Fi disconnected remain unverified.
+Continue from the [mission/HAT-health handover](../docs/mission-hat-handover-2026-10-14.md)
+and [QGC test evidence](../docs/qgc-lte-testing-2026-10-14.md).
 This is not an accepted flight system. See the
 [initial audit](../docs/pi-companion-audit-2026-10-14.md). Commands below run on
 the Pi unless identified as laptop/Android steps. No script issues aircraft
@@ -161,8 +161,8 @@ props removed and a separate test session are required for those tests.
 
 | Operation | Prerequisites / expected evidence | Current status |
 |---|---|---|
-| Heartbeat, GPS/map, battery/mode | AIO MAVLink and router active; QGC inspector and vehicle display | UART telemetry verified; Android router activation pending |
-| Parameter read | Matching system ID, completed download; no writes | UART read reply verified; Android full download pending |
+| Heartbeat, GPS/map, battery/mode | AIO MAVLink and router active; QGC inspector and vehicle display | Router active; FC1/1 telemetry reaches Android; display fields still need recorded checks |
+| Parameter read | Matching system ID, completed download; no writes | UART reply verified; owner confirmed Android download completion; saved export/comparison pending |
 | Mission download | QGC request/list/items/ack, match saved mission | Not verified |
 | Mission upload | Owner selects reviewed plan, mission ACK accepted, download comparison | Not verified |
 | Arm/disarm | Owner-approved props-off bench; normal pre-arm validation and COMMAND_ACK | Not verified |
@@ -178,8 +178,8 @@ Acceptance status:
 | Pi SSH, OS, camera detection | Verified live SSH audit and after reboot |
 | Camera H264 capture | Verified five-second file, not live Android stream |
 | LTE internet on Pi | Verified: QMI session, LTE-bound ping/DNS/HTTPS passed |
-| VPN through cellular NAT / Android endpoints | Verified reachability: private SSH and phone probe with Pi Wi-Fi disconnected; QGC endpoints still need app validation |
-| Heartbeats, GPS, bidirectional commands, missions | Partially verified: valid UART telemetry and read-only parameter reply; Android routing and mission/action commands pending |
+| VPN through cellular NAT / Android endpoints | Phone QGC connection/download confirmed with Pi Wi-Fi available; earlier LTE-only SSH/phone probes passed; LTE-only QGC acceptance pending |
+| Heartbeats, GPS, bidirectional commands, missions | FC1/1 telemetry routed to Android; UART return traffic observed; owner confirmed parameter download; mission/action tests pending |
 | Video inside Android QGC | Not verified |
 | Combined CPU/RAM/power load | Not verified; short camera test has no throttling flag |
 | Configurable video bitrate | Partially verified: files/config and rpicam test; profiles not streamed |
