@@ -15,6 +15,7 @@ if not 1 <= args.seconds <= 120:
     parser.error('--seconds must be 1..120')
 counts = Counter()
 headers = Counter()
+icmp_errors = Counter()
 # ETH_P_ALL is required to observe locally transmitted packets as well as RX.
 sock = socket.socket(socket.AF_PACKET, socket.SOCK_DGRAM, socket.htons(0x0003))
 sock.bind(('tailscale0', 0))
@@ -28,7 +29,7 @@ try:
             data = sock.recv(65535)
         except socket.timeout:
             continue
-        if len(data) < 28 or data[0] >> 4 != 4 or data[9] != 17:
+        if len(data) < 28 or data[0] >> 4 != 4:
             continue
         offset = (data[0] & 15) * 4
         if offset < 20 or len(data) < offset + 8:
@@ -36,6 +37,18 @@ try:
         if struct.unpack('!H', data[6:8])[0] & 0x1fff:
             continue
         source, dest = socket.inet_ntoa(data[12:16]), socket.inet_ntoa(data[16:20])
+        if data[9] == 1 and data[offset] == 3:
+            # ICMP destination unreachable quotes the rejected IP/UDP header.
+            quoted = data[offset + 8:]
+            if len(quoted) >= 28 and quoted[0] >> 4 == 4 and quoted[9] == 17:
+                quoted_offset = (quoted[0] & 15) * 4
+                if quoted_offset >= 20 and len(quoted) >= quoted_offset + 8:
+                    qsport, qdport = struct.unpack('!HH', quoted[quoted_offset:quoted_offset + 4])
+                    if {qsport, qdport} & {14550, 14560, 5600}:
+                        icmp_errors[(source, dest, data[offset + 1], qsport, qdport)] += 1
+            continue
+        if data[9] != 17:
+            continue
         sport, dport, length = struct.unpack('!HHH', data[offset:offset + 6])
         if not ({sport, dport} & {14550, 14560, 5600}):
             continue
@@ -43,7 +56,8 @@ try:
         counts[key] += 1
         # Count candidate MAVLink headers only; no position/parameter payloads
         # are retained, and this is not a CRC validation.
-        payload = data[offset + 8:offset + length]
+        # RTP video bytes can resemble magic bytes; never parse video as MAVLink.
+        payload = data[offset + 8:offset + length] if 5600 not in (sport, dport) else b''
         pos = 0
         while pos < len(payload):
             magic = payload[pos]
@@ -74,4 +88,8 @@ print(json.dumps({'event': 'summary', 'utc': dt.datetime.now(dt.timezone.utc).is
                   'candidate_mavlink_headers': [
                       {'source': k[0], 'destination': k[1], 'system': k[2],
                        'component': k[3], 'message_id': k[4], 'count': v}
-                      for k, v in sorted(headers.items())]}), flush=True)
+                      for k, v in sorted(headers.items())],
+                  'icmp_unreachable': [
+                      {'source': k[0], 'destination': k[1], 'code': k[2],
+                       'quoted_source_port': k[3], 'quoted_destination_port': k[4], 'count': v}
+                      for k, v in sorted(icmp_errors.items())]}), flush=True)

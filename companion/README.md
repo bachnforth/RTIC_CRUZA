@@ -5,7 +5,8 @@ NAT and one session-recovery test are verified. Pi UART configuration and
 monitoring are verified after reboot. Bidirectional AIO UART is verified after
 the ground connection was moved to physical pin 6. Phone-only routing is active;
 Android QGC 5.0.8 connects and the owner confirmed its parameter download completed.
-Video reception and QGC with Pi Wi-Fi disconnected remain unverified.
+Android video picture is verified in short bench sessions after an authorized
+QGC preference reset. QGC/video with Pi Wi-Fi disconnected remain unverified.
 Continue from the [mission/HAT-health handover](../docs/mission-hat-handover-2026-10-14.md)
 and [QGC test evidence](../docs/qgc-lte-testing-2026-10-14.md).
 This is not an accepted flight system. See the
@@ -180,7 +181,7 @@ Acceptance status:
 | LTE internet on Pi | Verified: QMI session, LTE-bound ping/DNS/HTTPS passed |
 | VPN through cellular NAT / Android endpoints | Phone QGC connection/download confirmed with Pi Wi-Fi available; earlier LTE-only SSH/phone probes passed; LTE-only QGC acceptance pending |
 | Heartbeats, GPS, bidirectional commands, missions | FC1/1 telemetry routed to Android; UART return traffic observed; owner confirmed parameter download; mission/action tests pending |
-| Video inside Android QGC | Not verified |
+| Video inside Android QGC | Actual picture observed after QGC preference reset and after app restart; short bench session with Pi Wi-Fi available, LTE-only pending |
 | Combined CPU/RAM/power load | Not verified; short camera test has no throttling flag |
 | Configurable video bitrate | Partially verified: files/config and rpicam test; profiles not streamed |
 | Boot startup / individual recovery / LTE outage | Partially verified: network/monitoring services restart; NM recovered one bearer disconnect; LTE cold boot, prolonged outages and router/video recovery remain pending |

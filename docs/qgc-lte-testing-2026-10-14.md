@@ -4,6 +4,16 @@ Continues [the handover](qgc-lte-handover-2026-10-14.md).
 
 ## Final outcome
 
+Video follow-up subsequently succeeded: with owner authorization, QGC preferences
+were reset and LTE/video settings recreated through the phone UI over USB.
+Its prior saved log showed "Stream not enabled/configured". After reset,
+selecting UDP h.264 opened phone UDP5600. Actual camera picture was observed
+in the lower-left panel, including after another QGC restart with the restored
+explicit LTE HAT link and metric units. Refreshed session21:30:10 UTC showed
+picture and telemetry together. Default decoder worked; camera image blurred.
+Pi Wi-Fi remained connected. Video still stops automatically after120s; no
+LTE-only/long-load/flight acceptance is implied. See latest handover for details.
+
 The owner confirmed that QGC's parameter download completed after reconnecting.
 Android QGC 5.0.8 (64-bit) now connects through the private Pi endpoint with
 bidirectional routing. Full parameter export/count comparison is not yet saved.
@@ -54,6 +64,17 @@ At 19:49:54 UTC, live inspection confirmed:
 - `get_throttled=0x0`.
 
 ## Session observations and remaining acceptance
+
+Video follow-up: first live service session started20:50:42 UTC and stopped
+normally at20:52:42 UTC (`failed=false`). Camera encoding/GStreamer RTP were
+active, and a5s observation saw197 packets to phone UDP5600 plus concurrent
+telemetry. Owner reported no picture with UDP h.264 and URL0.0.0.0:5600.
+After another bounded session, software-decoder selection and QGC reopen,
+the20:57:16–20:57:31 UTC capture saw500 video packets and19 phone ICMPcode3
+port-unreachable replies quoting UDP5600. Picture remains unverified; investigate
+phone receiver startup through QGC Console. The observer was corrected to skip
+MAVLink scanning of RTP bytes and include ICMP metadata. Prior video payload
+candidate-header output was false positives and must not be used as telemetry.
 
 At 20:31 UTC the owner's passive capture showed phone 100.100.0.57:14550
 sending to Pi :14560: 15 heartbeats, 53 parameter-read requests, 31 stream
@@ -138,9 +159,10 @@ Saved phone link settings and heartbeat emission remain to be checked.
 
 Owner was asked to connect Android QGC with UDP listening port 14550 and
 explicit server 100.100.0.58:14560, and report version and live disarmed state.
-Phone connection and parameter-download completion are now owner-confirmed.
-Saved parameter export/comparison, mission download, actual video picture,
-and application traffic with Pi Wi-Fi disconnected remain pending.
+Phone connection and parameter-download completion are now owner-confirmed;
+actual video picture was subsequently observed after QGC preference reset.
+Saved parameter export/comparison, mission download and application traffic
+with Pi Wi-Fi disconnected remain pending.
 No Wi-Fi disconnect was performed in this continuation. Diagnostics generated
 no aircraft commands. QGC's automatic protocol requests were routed; no explicit
 arming, motor, mode, parameter-write, mission-upload or flight-safety changes

@@ -4,6 +4,11 @@ Date: 2026-10-14. Repository: https://github.com/bachnforth/RTIC_CRUZA,
 branch `main`. Local checkout:
 `C:\Users\ebach\Documents\ChatGPT\Fixed wing Cruza`.
 
+Continuation: [bench reads, route inputs and recorder tests](mission-hat-progress-2026-10-14.md).
+Current AIO mission and full USB parameter snapshot are now saved; LTE-only
+QGC/video acceptance and route constraints remain pending. Recorder setup:
+[HAT flight-health capture](hat-flight-health-capture.md).
+
 ## User's next objective
 
 Create a reviewed fixed-wing route that goes **5 km from home and returns**,
@@ -47,11 +52,60 @@ Evidence: [QGC continuation](qgc-lte-testing-2026-10-14.md),
 
 ## Outstanding integration checks before flight acceptance
 
+**Video now works in Android QGC (short bench test, Pi Wi-Fi available).**
+The owner authorized a QGC preference reset. After using General → Clear all
+settings on next start and restarting QGC, selecting UDP h.264 immediately
+opened phone UDP5600. The app's prior saved log reported "Stream not
+enabled/configured" despite a valid URI; this indicates the application start
+guard blocked video. The precise stored setting was inaccessible in the
+non-debuggable app, so do not claim a particular INI value was directly read.
+No app-data wipe, uninstall, firmware change or FC parameter write was performed.
+
+Recreated LTE HAT link: UDP local14550, added server100.100.0.58:14560,
+automatically connect on start enabled, High Latency off, UDP AutoConnect off.
+Restored metric units and the offline ArduPilot/fixed-wing selection. Video
+source UDP h.264, URL0.0.0.0:5600, default decoder after reset. The previous
+software override was not needed for successful playback. A subsequent QGC
+restart reconnected telemetry and showed the camera in the lower-left panel.
+Final refreshed session at21:30:10 UTC again showed an actual camera picture
+alongside live telemetry. Pi45.6 C, throttled0x0 in the preceding check.
+Image was visibly blurred; assess lens/focus/view separately. QGC still reported
+PreArm: RC calibrating and GPS0; these were not changed or resolved in video work.
+
+Video remains manually started with120s sessions and no viewer detection. It
+will normally return to WAITING FOR VIDEO after the timer expires. Start a new
+session with `sudo systemctl start cruza-video` when needed. LTE-only video,
+combined long-duration load and flight health remain unverified.
+
+USB diagnosis worked on the owner's Galaxy S24 after owner-approved ADB access.
+Google Platform Tools37.0.1 were downloaded under ignored/local
+`tmp/qgc-android-tools/`. Saved app log was pulled from
+`/sdcard/Android/data/org.mavlink.qgroundcontrol/files/QGroundControl/Logs/qgc-video-debug.txt`
+to local `tmp/qgc-android-logs/qgc-video-debug.txt`. Do not push this raw log or
+phone screenshots by default. The phone may remain USB-connected; inspect
+current ADB authorization/device state. Avoid collecting unrelated phone data.
+
+**Earlier video troubleshooting, resolved by the reset above:** sessions started at20:50:42 UTC and20:57:16
+UTC sent H264 RTP packets to phone100.100.0.57:5600, but the owner saw no
+picture. QGC screenshots confirmed UDP h.264 and URL0.0.0.0:5600; owner selected
+Force software decoder and reopened QGC. The subsequent15s capture saw500
+video packets and19 ICMP destination-unreachable/code3 replies from the phone
+quoting UDP5600. Thus packet delivery reaches the phone but its video listener
+appears absent/rejected; decoder/UI receiver startup logs are needed. Obtain
+QGC Application Settings→Console→Set Logging (searchvideo), toggle source off/on,
+then Save App Log. URL format confirmed in official v5.0.8 source; do not add
+an extra `udp://` prefix. Short sessions stop normally after120s and must be
+restarted when the viewer is ready. Do not mark video accepted or reinstall
+working Pi components based on a blank phone screen.
+
+The packet observer now also summarizes ICMP unreachable metadata and excludes
+RTP payloads from candidate MAVLink parsing; random video bytes are not MAVLink.
+
 1. Verify fresh FC disarmed state and all visible QGC telemetry fields; save a
    full parameter export and compare UART2, ELRS/GPS and safety settings.
 2. Download/compare the existing mission. Do not upload a new mission as a
    connectivity test.
-3. Confirm Android video: UDP h.264, port5600. Start only with a ready viewer:
+3. Extend the short confirmed Android video test: UDP h.264, port5600. Start only with a ready viewer:
    `sudo systemctl start cruza-video`. Economy 640x480/15 fps/300 kbps, 120 s limit,
    no boot autostart. Record actual picture, latency and combined telemetry load.
 4. Prove QGC and a fresh parameter reply with Pi Wi-Fi disconnected. Earlier
