@@ -1,0 +1,19 @@
+[Unit]
+Description=Cruza manually requested H264 RTP video
+After=network-online.target tailscaled.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=ebach
+SupplementaryGroups=video render
+ExecStart=/usr/bin/python3 /opt/cruza/cruza.py video
+Restart=on-failure
+RestartSec=30
+KillMode=control-group
+TimeoutStopSec=15
+Nice=10
+NoNewPrivileges=yes
+
+# Deliberately no Install section: video never starts automatically at boot.

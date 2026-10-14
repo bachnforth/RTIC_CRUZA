@@ -1,0 +1,20 @@
+[Unit]
+Description=Cruza private MAVLink routing
+After=network-online.target tailscaled.service cruza-firewall.service
+Wants=network-online.target
+Requires=cruza-firewall.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/cruza/cruza.py router
+Restart=on-failure
+RestartSec=30
+RuntimeDirectory=cruza
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/cruza
+
+[Install]
+WantedBy=multi-user.target

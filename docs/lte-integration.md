@@ -1,5 +1,35 @@
 # LTE integration — 2026-10-13
 
+## Pi LTE and private-network verification — 2026-10-14
+
+- Corrected USB topology: owner removed cable from Pi data socket to HAT
+  downstream USB1. Stacked pogo connection then enumerated hub 1a40:0101 and
+  modem 1e0e:9001. USB1/USB2 are peripheral ports, not inputs from the Pi.
+- ModemManager detects SIM7600G-H, firmware LE20B04SIM7600G22, with qmi_wwan
+  and option drivers. AT&T LTE roaming registration; signal quality 67.
+- Owner activated NetworkManager `cruza-lte`, APN america.bics; data interface
+  wwan0. IPv4 100.80.66.223/26, gateway 100.80.66.224, DNS 8.8.8.8/8.8.4.4.
+  Address is within carrier shared-address space, so private VPN remains required.
+- LTE-bound ping: 3/3 replies, 61–243 ms in this small sample. LTE-bound HTTPS
+  to example.com returned 200 with local address 100.80.66.223. A DNS query
+  explicitly bound to wwan0 returned a valid response from 8.8.8.8.
+- Disconnected Pi Wi-Fi with an independently scheduled 90-second restoration.
+  Private SSH to Pi 100.100.0.58 succeeded while wlan0 was disconnected and
+  wwan0 was the sole default route. Pi reached Android 100.100.0.57 via relay,
+  153 ms in one probe. This verifies Headscale access over LTE through NAT.
+- Timed restoration successfully reconnected RN08. Wi-Fi remains preferred
+  at metric 600; LTE at 700. LTE autoconnect=yes, retries=0 (unlimited).
+- Controlled recovery: disconnected modem bearers with mmcli; NetworkManager
+  automatically reactivated cruza-lte. Subsequent LTE-bound HTTPS returned 200.
+  This is one session-disruption test, not prolonged coverage-loss validation.
+- Usage monitoring is sampling wwan0 and persists approximate counters. Sample
+  cumulative estimate was 151,029 bytes, not carrier-billed usage. No throttling
+  flags reported during these tests. No aircraft commands or FC changes made.
+
+LTE connectivity is now verified on the Pi. AIO UART reception, actual Android
+video reception, combined traffic/resource tests and controlled flight testing
+remain incomplete. See [Pi audit](pi-companion-audit-2026-10-14.md).
+
 ## Hardware
 
 - Waveshare SIM7600G-H 4G HAT (B), SKU 19485.

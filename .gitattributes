@@ -1,3 +1,4 @@
 firmware/** -text
 logs/**/*.BIN -text
 logs/**/*.png -text
+companion/** text eol=lf

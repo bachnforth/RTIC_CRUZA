@@ -1,0 +1,16 @@
+{
+  "changes": {
+    "SERIAL2_BAUD": {
+      "before": 57.0,
+      "after": 115.0
+    },
+    "SERIAL2_PROTOCOL": {
+      "before": -1.0,
+      "after": 2.0
+    }
+  },
+  "unrelated_differences": {},
+  "after_snapshot": "C:\\Users\\ebach\\Documents\\ChatGPT\\Fixed wing Cruza\\params\\cruza_params_2026-10-14_181011Z_after_pi_uart.params",
+  "reboot_sent": false,
+  "arming_or_motor_commands_sent": false
+}

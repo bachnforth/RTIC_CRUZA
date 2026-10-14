@@ -1,0 +1,13 @@
+{
+  "serial_device": "/dev/serial0",
+  "baud": 115200,
+  "android_ip": "",
+  "mavlink_port": 14560,
+  "video_port": 5600,
+  "video_profile": "economy",
+  "video_max_seconds": 1800,
+  "lte_connection": "cruza-lte",
+  "lte_interface": "",
+  "apn": "america.bics",
+  "usage_warning_bytes": 2000000000
+}

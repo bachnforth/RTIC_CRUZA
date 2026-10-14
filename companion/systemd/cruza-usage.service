@@ -1,0 +1,10 @@
+[Unit]
+Description=Sample Cruza LTE interface usage
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/cruza/cruza.py usage
+StateDirectory=cruza
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes

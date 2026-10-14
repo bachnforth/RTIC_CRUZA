@@ -53,6 +53,12 @@ in [the flight review](docs/flight-review-2026-10-09.md). Follow the
 compare it against the retained baseline.
 
 ## Layout
+
+The Pi/LTE/video companion implementation is in [companion/](companion/README.md).
+See the [2026-10-14 live Pi audit](docs/pi-companion-audit-2026-10-14.md) for
+verified hardware, software tests and deployment blockers. Android video, Pi LTE
+and the new MAVLink connection still require bench validation.
+
 - `docs/` build notes, wiring, config steps
 - `params/` parameter files
 - `missions/` QGC .plan files

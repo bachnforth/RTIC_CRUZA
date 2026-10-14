@@ -1,5 +1,18 @@
 # Build status — 2026-10-08
 
+## Pi companion UART configured — 2026-10-14
+
+- USB on COM17 verified disarmed ArduPlane system/component 1/1. Complete live
+  snapshots contain 1245 parameters. Firmware reports 4.7.1.
+- UART2 was disabled. Changed only SERIAL2_BAUD 57 → 115 and SERIAL2_PROTOCOL
+  -1 → 2; SERIAL2_OPTIONS remains 0. Independent readbacks succeeded, and the
+  full after snapshot has no unrelated parameter differences. ELRS, GPS and
+  safety settings were preserved. No arming, motor or reboot command was sent.
+- Snapshots: `params/cruza_params_2026-10-14_181011Z_before_pi_uart.params` and
+  `params/cruza_params_2026-10-14_181011Z_after_pi_uart.params`.
+- Pi UART/MAVLink heartbeat verification remains pending AIO restart/wiring
+  validation. See [Pi companion audit](pi-companion-audit-2026-10-14.md).
+
 ## Calibration confirmation reviewed — 2026-10-13, log 16
 
 - [Confirmation-flight review](flight-review-2026-10-13-calibration-confirmation.md). Full 300-second loiter completed; flight lasted 7 min 41 s from arm to disarm.

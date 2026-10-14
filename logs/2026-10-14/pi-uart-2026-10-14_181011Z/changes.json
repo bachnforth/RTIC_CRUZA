@@ -1,0 +1,10 @@
+{
+  "SERIAL2_BAUD": {
+    "before": 57.0,
+    "after": 115.0
+  },
+  "SERIAL2_PROTOCOL": {
+    "before": -1.0,
+    "after": 2.0
+  }
+}
