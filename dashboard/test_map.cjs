@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');
+const {positionState,validPosition}=require('./dist/map-state.js');
+const pos={latitude:35,longitude:-79};
+assert.equal(validPosition({latitude:0,longitude:0}),true);
+assert.equal(validPosition({latitude:NaN,longitude:1}),false);
+assert.equal(validPosition({latitude:91,longitude:1}),false);
+assert.equal(positionState({configured:true,online:true,position:pos,position_age:1}).kind,'live');
+assert.equal(positionState({configured:true,online:false,position:pos}).position,null);
+assert.equal(positionState({configured:true,online:false,track:[{...pos,age_seconds:20}]}).kind,'last');
+assert.equal(positionState({configured:true,online:true,track:[{...pos,age_seconds:301}]}).position,null);
+assert.equal(positionState({configured:true,online:true,track:[{...pos,age_seconds:-1}]}).position,null);
+assert.equal(positionState({configured:true,online:true,gps:{fix_type:0,satellites:0}}).label,'No GPS fix · 0 satellites');
+assert.equal(positionState({configured:false,online:true,position:pos}).kind,'unconfigured');
+console.log('10 map position-state assertions passed');

@@ -91,7 +91,8 @@ flowchart LR
 10. Android video source: `UDP h.264`, receiving port 5600 (or UDP URL
     `0.0.0.0:5600` where that app version exposes it). Enable low latency if
     available. Start a session with `sudo systemctl start cruza-video`, stop
-    with `sudo systemctl stop cruza-video`. No video starts on boot. If the
+    with `sudo systemctl stop cruza-video`. Boot startup is opt-in; see
+    [automatic video startup](../docs/video-autostart.md). If the
     installed Android build lacks the source/decoder, record exact version
     and diagnose; desktop documentation alone is not proof of compatibility.
 
@@ -109,10 +110,11 @@ Estimated encoded payload: 135 MB/hour at 300 kbps, 180 MB/hour at 400 kbps,
 225 MB/hour at 500 kbps (decimal MB). Add RTP/IP/VPN and telemetry overhead.
 24 GB/year allows about 178/133/107 hours of video payload respectively if
 the entire allowance were devoted to video. Real usable time is lower.
-Example-config sessions stop after 1800 seconds; the live Pi currently uses a
-120-second bench-test limit. Failure retries are bounded by
-systemd (three starts per five minutes). Sessions require manual start; there
-is no viewer detector or automatic bitrate adaptation. A restarted failed
+Example-config sessions stop after 1800 seconds. Setting `video_max_seconds`
+to `0` streams until stopped; the opt-in boot-start installer selects this setting.
+Failure retries are bounded by
+systemd (three starts per five minutes). Sessions require manual start unless
+boot startup is enabled; there is no viewer detector or automatic bitrate adaptation. A restarted failed
 session starts a new duration window. QGC closing alone does not stop video;
 explicitly stop it. Automatic viewer-based control can follow validation.
 
