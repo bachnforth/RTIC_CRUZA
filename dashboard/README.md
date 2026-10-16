@@ -303,3 +303,62 @@ The dashboard uses the existing SSH identity and strict known-host verification;
 keys and runtime configuration are not bundled. The deployment scripts are
 bench-specific, guarded migrations for the audited Pi versions, not universal
 installers; they deliberately refuse changed source hashes.
+
+### U.S. state boundaries (16 October 2026)
+
+The offline map now includes all 50 U.S. states and Washington, DC, with state
+borders, zoom-dependent postal labels and full state names on hover. Initial
+framing and **U.S. overview** show the contiguous U.S.; Alaska and Hawaii are
+included and can be reached by panning/zooming. This basemap framing is not an
+inferred aircraft position. Fit/follow still uses only real telemetry. State
+borders remain visible over optional street tiles. Both live camera panels stay
+in the combined layout.
+
+`dist/us-states.geojson` retains only USA geometry, names, postal codes and label
+coordinates from the public-domain Natural Earth 1:110m
+[states/provinces dataset](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_admin_1_states_provinces.geojson).
+Its 51 unique features were checked, including numeric label coordinates; SHA256
+`6c31b8f35e04a8a2ea808e1aa245c37134e8c7fe161db9329e8b93afcd2b9eca`.
+The dataset is an overview, with generalized boundaries. It is served locally
+and adds no external map requests. The laptop viewer was restarted to serve the
+new asset; no aircraft service was changed or restarted.
+
+### Alabama counties, places and major roads (16 October 2026)
+
+**Alabama** frames the state while retaining both camera panels. Local layers
+load once when the state enters view at zoom 5 or closer. County borders, major
+cities and interstates start at zoom 6; U.S. highways at 7; county names and
+regional cities at 8; state highways at 9; smaller incorporated places at 10;
+and other Census places at 12. Interstate route badges start at 7, U.S. route
+badges at 9 and state route badges at 11. Labels compete for space by priority,
+so not every name is printed simultaneously; city dots and hover names retain
+access to the place names. Counties, Cities and Highways switches independently
+show/hide their layers. Boundary and road geometry are generalized for display.
+
+The bundled data contain 67 counties, 594 incorporated/Census places, and 373
+named interstate, U.S. and state-highway route groups. Major city labels are a
+fixed display-priority list, not a population ranking. Place locations use points
+inside their Census boundaries, not estimates of aircraft positions. Highway
+geometry is grouped by route name/type, simplified and drawn on a canvas below
+aircraft markers. Only visible labels are laid out; overlapping names are
+suppressed. No flight, radio, camera or observer settings were changed.
+
+Sources are the U.S. Census Bureau TIGERweb county query, 2024 Alabama 1:500k
+cartographic places, and 2025 Alabama primary/secondary roads. Exact URLs,
+feature counts, retrieval date and output hashes are in
+`alabama-data-sources.json`. Census attribution is visible on the map. These
+layers use only local files, even when internet or optional street tiles are
+unavailable. Roads are static map data; local residential streets remain
+available through the optional street-map layer.
+
+To rebuild, put the source files at `runtime/al-counties-source.geojson`,
+`runtime/al-places.zip`, and `runtime/al-roads.zip`. The build tool uses pyshp
+3.1.6, Shapely 2.2.0 from `runtime/map-build-deps/` and the project's existing
+NumPy 2.5.3 in `.flightlog-deps/`. Run `python dashboard/build-alabama-data.py`.
+These packages are build-only; normal viewing requires no GIS package.
+
+Validation: dataset checks verify all 67 unique Alabama county IDs, city coverage
+and major interstate routes. Browser checks verified county/city/route labels at
+closer zoom, removal of county lines/names independently of roads, and deeper
+zoom detail. Camera panels remain in the combined layout. Restarting the laptop
+viewer to add static assets did not restart an aircraft service.

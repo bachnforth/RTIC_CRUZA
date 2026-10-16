@@ -1,18 +1,44 @@
 'use strict';
 (function(){
 const titles={cruza:'Cruza',quadpi:'quadpi',rn03:'RN03 aircraft'},colors={cruza:'#7ce1ba',quadpi:'#7dbcf4',rn03:'#d3a9ed'};
-const map=L.map('map',{minZoom:1,maxZoom:19,worldCopyJump:true,scrollWheelZoom:false}).setView([20,0],2);
+const map=L.map('map',{minZoom:1,maxZoom:19,worldCopyJump:true,scrollWheelZoom:false}).setView([39,-98],3);
+map.createPane('basemap').style.zIndex=240;
+map.createPane('stateBorders').style.zIndex=300;
+map.createPane('stateLabels').style.zIndex=350;
+map.getPane('stateLabels').style.pointerEvents='none';
 L.control.scale({imperial:false}).addTo(map);
-const layers={},follow=document.querySelector('#follow-fleet');let latest=[],fitting=false,streets=null,countries=null;
-map.on('dragstart zoomstart',e=>{if(!fitting && (e.type==='dragstart'||e.originalEvent))follow.checked=false;});
-map.on('zoomstart',()=>{if(!fitting)follow.checked=false;});
-new ResizeObserver(()=>map.invalidateSize({pan:false})).observe(document.querySelector('#map'));
+const layers={},follow=document.querySelector('#follow-fleet');let latest=[],fitting=false,streets=null,countries=null,overviewMode=true;
+map.on('dragstart zoomstart',e=>{if(!fitting && (e.type==='dragstart'||e.originalEvent)){follow.checked=false;overviewMode=false;}});
+map.on('zoomstart',()=>{if(!fitting){follow.checked=false;overviewMode=false;}});
+new ResizeObserver(()=>{map.invalidateSize({pan:false});if(overviewMode)usOverview(overviewMode);}).observe(document.querySelector('#map'));
 fetch('/world.geojson').then(r=>{if(!r.ok)throw Error();return r.json();}).then(data=>{
- countries=L.geoJSON(data,{style:{color:'#456476',weight:1,fillColor:'#284657',fillOpacity:1},onEachFeature:(f,l)=>{l.bindTooltip(f.properties.NAME||f.properties.ADMIN||'');}});
+ countries=L.geoJSON(data,{pane:'basemap',style:{color:'#456476',weight:1,fillColor:'#284657',fillOpacity:1},onEachFeature:(f,l)=>{l.bindTooltip(f.properties.NAME||f.properties.ADMIN||'');}});
  if(!streets)countries.addTo(map).bringToBack();map.attributionControl.addAttribution('Overview: Natural Earth (public domain)');
 }).catch(()=>{document.querySelector('#map-layer-note').textContent='Offline outlines unavailable; aircraft markers still work.';});
-function fit(){const points=latest.map(v=>FleetMapState.positionState(v)).filter(s=>s.position).map(s=>[s.position.latitude,s.position.longitude]);if(!points.length)return;fitting=true;try{map.fitBounds(L.latLngBounds(points),{padding:[60,50],maxZoom:16,animate:false});}finally{fitting=false;}}
-function focus(v){const s=FleetMapState.positionState(v);if(!s.position)return;follow.checked=false;map.setView([s.position.latitude,s.position.longitude],Math.max(map.getZoom(),16),{animate:false});layers[v.name]?.marker?.openPopup();}
+// Offline borders and postal labels; all coordinates are public basemap data.
+let stateLabels=[];
+function showStateLabels(){
+ const zoom=map.getZoom();
+ for(const {marker,large,postal} of stateLabels){const show=!(postal==='AL'&&zoom>=6)&&(zoom>=5||(zoom>=4&&large>3)||(zoom>=3&&large>18));if(show&&!map.hasLayer(marker))marker.addTo(map);else if(!show&&map.hasLayer(marker))map.removeLayer(marker);}
+}
+map.on('zoomend',showStateLabels);
+fetch('/us-states.geojson').then(r=>{if(!r.ok)throw Error();return r.json();}).then(data=>{
+ L.geoJSON(data,{pane:'stateBorders',style:{color:'#94b7ca',weight:1.3,opacity:.85,fill:false},onEachFeature:(f,l)=>{
+  l.bindTooltip(f.properties.name+' · '+f.properties.postal,{sticky:true});
+  const p=f.properties;if(!Number.isFinite(p.label_lat)||!Number.isFinite(p.label_lon))return;
+  const span=document.createElement('span');span.textContent=p.postal;
+  const marker=L.marker([p.label_lat,p.label_lon],{pane:'stateLabels',interactive:false,keyboard:false,icon:L.divIcon({className:'state-label',html:span,iconSize:[28,16],iconAnchor:[14,8]})});
+  const b=l.getBounds();stateLabels.push({marker,postal:p.postal,large:(b.getEast()-b.getWest())*(b.getNorth()-b.getSouth())});
+ }}).addTo(map);showStateLabels();
+}).catch(()=>{document.querySelector('#map-layer-note').textContent='State outlines unavailable. Aircraft positions and the world overview still work.';});
+function usOverview(region='us'){overviewMode=region;fitting=true;try{map.fitBounds(region==='alabama'?AlabamaMap.bounds:[[24,-125],[50,-66]],{padding:[12,12],animate:false});}finally{fitting=false;}}
+// The overview is a map location, never an inferred aircraft position.
+usOverview();
+document.querySelector('#us-view').onclick=()=>{follow.checked=false;usOverview();};
+document.querySelector('#al-view').onclick=()=>{follow.checked=false;usOverview('alabama');};
+AlabamaMap.attach(map);
+function fit(){const points=latest.map(v=>FleetMapState.positionState(v)).filter(s=>s.position).map(s=>[s.position.latitude,s.position.longitude]);if(!points.length)return;overviewMode=false;fitting=true;try{map.fitBounds(L.latLngBounds(points),{padding:[60,50],maxZoom:16,animate:false});}finally{fitting=false;}}
+function focus(v){const s=FleetMapState.positionState(v);if(!s.position)return;overviewMode=false;follow.checked=false;map.setView([s.position.latitude,s.position.longitude],Math.max(map.getZoom(),16),{animate:false});layers[v.name]?.marker?.openPopup();}
 function popup(v,s){const box=document.createElement('div'),title=document.createElement('strong');title.textContent=titles[v.name];box.append(title,document.createElement('br'));box.append(document.createTextNode(s.label),document.createElement('br'));box.append(document.createTextNode(s.position.latitude.toFixed(6)+', '+s.position.longitude.toFixed(6)));if(s.kind==='live'&&Number.isFinite(s.position.altitude_relative_m)){box.append(document.createElement('br'),document.createTextNode('Relative altitude '+s.position.altitude_relative_m.toFixed(1)+' m'));}return box;}
 function update(fleet){latest=fleet;const legend=document.querySelector('#map-legend');legend.replaceChildren();let live=0,last=0;
  for(const id of Object.keys(titles)){

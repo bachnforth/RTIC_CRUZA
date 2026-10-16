@@ -12,3 +12,16 @@ assert.equal(positionState({configured:true,online:true,track:[{...pos,age_secon
 assert.equal(positionState({configured:true,online:true,gps:{fix_type:0,satellites:0}}).label,'No GPS fix · 0 satellites');
 assert.equal(positionState({configured:false,online:true,position:pos}).kind,'unconfigured');
 console.log('10 map position-state assertions passed');
+const fs=require('node:fs'),path=require('node:path');
+const dataset=name=>JSON.parse(fs.readFileSync(path.join(__dirname,'dist',name),'utf8'));
+const counties=dataset('al-counties.geojson'),places=dataset('al-places.geojson'),roads=dataset('al-roads.geojson');
+assert.equal(counties.features.length,67);
+assert.equal(new Set(counties.features.map(f=>f.properties.geoid)).size,67);
+assert.ok(counties.features.every(f=>f.properties.geoid.startsWith('01')));
+for(const name of ['Jefferson County','Madison County','Montgomery County'])assert.ok(counties.features.some(f=>f.properties.name===name));
+assert.ok(places.features.length>500);
+assert.ok(places.features.every(f=>f.properties.geoid.startsWith('01')&&validPosition({latitude:f.geometry.coordinates[1],longitude:f.geometry.coordinates[0]})));
+for(const name of ['Birmingham','Huntsville','Montgomery','Mobile','Tuscaloosa'])assert.ok(places.features.some(f=>f.properties.name===name&&f.properties.min_zoom===6));
+for(const name of ['I-10','I-20','I-22','I-59','I-65','I-85'])assert.ok(roads.features.some(f=>f.properties.name===name));
+assert.ok(roads.features.every(f=>['I','U','S'].includes(f.properties.kind)&&['LineString','MultiLineString'].includes(f.geometry.type)));
+console.log('Alabama geography checks passed: county coverage, city labels and major interstate routes');

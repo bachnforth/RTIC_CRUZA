@@ -261,7 +261,8 @@ class Handler(BaseHTTPRequestHandler):
                                   allow_nan=False).encode()
             content_type = 'application/json'
         elif path in ('/', '/index.html','/fleet.js','/fleet.css','/fleet-map.js',
-                      '/leaflet.js','/leaflet.css','/world.geojson','/map-state.js'):
+                      '/leaflet.js','/leaflet.css','/world.geojson','/us-states.geojson','/map-state.js',
+                      '/alabama-map.js','/al-counties.geojson','/al-places.geojson','/al-roads.geojson'):
             name = 'index.html' if path == '/' else path.lstrip('/')
             raw = (HERE/'dist'/name).read_bytes()
             content_type = {'js':'application/javascript','css':'text/css',
