@@ -14,7 +14,14 @@ import struct
 import subprocess
 import threading
 import time
-from fleet import VehicleState
+from fleet import Limits, VehicleState
+
+# Alert thresholds. Cruza's values copy its own flight-controller settings
+# (BATT_LOW_VOLT 14.0, BATT_CRT_VOLT 13.2, AIRSPEED_MIN 10 in the 2026-10-14
+# snapshot); update them here if those parameters change. quadpi's battery
+# limits are unknown, so its battery and airspeed checks stay off.
+LIMITS = {'cruza': Limits(battery_low_v=14.0, battery_critical_v=13.2, airspeed_min_m_s=10),
+          'quadpi': Limits()}
 
 HERE = Path(__file__).resolve().parent
 KEY = Path.home()/'.ssh'/'id_ed25519_rpi'
@@ -121,7 +128,7 @@ class Telemetry:
     """Receives bounded JSON via SSH; cannot write bytes to an aircraft socket."""
     def __init__(self, name, host, alias, port):
         self.name, self.host, self.alias, self.port = name, host, alias, port
-        self.state = VehicleState(name)
+        self.state = VehicleState(name, limits=LIMITS.get(name))
         self.proc = None
         self.lock = threading.Lock()
         self.error = ''

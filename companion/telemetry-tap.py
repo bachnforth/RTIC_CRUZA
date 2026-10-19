@@ -15,7 +15,11 @@ import socket
 import struct
 import time
 
-IDS = {0, 1, 24, 30, 33, 42, 46, 74, 147, 245}
+IDS = {0, 1, 24, 30, 33, 42, 46, 74, 147, 242, 245, 253}
+# STATUSTEXT (253) carries the autopilot's warnings. Each one is a different
+# message, so it bypasses the per-type 0.5 s thinning but is capped at
+# TEXT_BURST messages per TEXT_WINDOW seconds.
+STATUSTEXT, TEXT_BURST, TEXT_WINDOW = 253, 20, 10
 SOURCES = {'cruza': ('tailscale0', '100.100.0.58', 14560),
            'quadpi': ('eth0', '10.223.79.20', 14551)}
 
@@ -80,7 +84,7 @@ def main():
         os.setgid(nobody.pw_gid)
         os.setuid(nobody.pw_uid)
         os.nice(19)
-        last, next_meta, progress = {}, 0, time.monotonic()
+        last, texts, next_meta, progress = {}, [], 0, time.monotonic()
         def emit(value):
             nonlocal progress, running
             try:
@@ -111,7 +115,13 @@ def main():
                 continue
             selected = mav_frames(packet) if quad else frames(packet, address, port)
             for mid, raw in selected:
-                if now-last.get(mid, -100) >= .5:
+                if mid == STATUSTEXT:
+                    while texts and now-texts[0] > TEXT_WINDOW:
+                        texts.pop(0)
+                    if len(texts) < TEXT_BURST:
+                        texts.append(now)
+                        emit({'frame': raw.hex()})
+                elif now-last.get(mid, -100) >= .5:
                     emit({'frame': raw.hex()})
                     last[mid] = now
 
