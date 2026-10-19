@@ -21,7 +21,9 @@ import urllib.request
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE/'runtime'/'imagery'
-SOURCE = 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}'
+SERVICE = 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer'
+SOURCE = SERVICE+'/tile/{z}/{y}/{x}'
+EXPORT = SERVICE+'/export?bbox={bbox}&bboxSR=3857&imageSR=3857&size=256,256&format=jpg&f=image'
 # Planned home of the October 2026 calibration mission (missions/*.plan).
 FIELD = (33.7232248, -85.9066882)
 # (first zoom, last zoom, radius as a multiple of --radius-km). Wide, coarse
@@ -44,16 +46,20 @@ def tile_range(lat, lon, radius_km, z):
     return [(z, x, y) for x in range(x0, x1+1) for y in range(y0, y1+1)], bounds
 
 
-def fetch(job):
-    z, x, y = job
-    path = OUT/str(z)/str(x)/f'{y}.jpg'
-    if path.exists():
-        return 'kept'
-    request = urllib.request.Request(SOURCE.format(z=z, x=x, y=y),
-                                     headers={'User-Agent': 'cruza-fleet-dashboard offline field imagery'})
+def mercator_bbox(z, x, y):
+    """Web Mercator (EPSG:3857) extent of one map tile, in metres."""
+    half = math.pi*6378137
+    size = 2*half/2**z
+    west, north = -half+x*size, half-y*size
+    return f'{west:.3f},{north-size:.3f},{west+size:.3f},{north:.3f}'
+
+
+def download(url):
+    """Image bytes, 'missing' when the service has none, or 'failed'."""
+    request = urllib.request.Request(url, headers={'User-Agent': 'cruza-fleet-dashboard offline field imagery'})
     for attempt in range(3):
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with urllib.request.urlopen(request, timeout=60) as response:
                 raw = response.read()
             break
         except urllib.error.HTTPError as error:
@@ -64,8 +70,21 @@ def fetch(job):
             time.sleep(2**attempt)
     else:
         return 'failed'
-    if not (raw.startswith(b'\xff\xd8') or raw.startswith(b'\x89PNG')):
-        return 'missing'
+    return raw if raw.startswith(b'\xff\xd8') or raw.startswith(b'\x89PNG') else 'missing'
+
+
+def fetch(job):
+    z, x, y = job
+    path = OUT/str(z)/str(x)/f'{y}.jpg'
+    if path.exists():
+        return 'kept'
+    raw = download(SOURCE.format(z=z, x=x, y=y))
+    if raw == 'missing':
+        # The ready-made tiles stop at zoom 16; the same service renders any
+        # area on request, at the full resolution of the aerial photos.
+        raw = download(EXPORT.format(bbox=mercator_bbox(z, x, y)))
+    if isinstance(raw, str):
+        return raw
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix('.part')
     temporary.write_bytes(raw)
@@ -103,7 +122,13 @@ def main():
                 print(f'  {done}/{len(jobs)} · ' + ', '.join(f'{k} {v}' for k, v in sorted(counts.items())), flush=True)
 
     saved = sum(1 for _ in OUT.rglob('*.jpg'))
-    if not saved:
+    # Only advertise zoom levels that actually have imagery on disk; the map
+    # enlarges the sharpest saved level beyond that.
+    for layer in layers:
+        have = [z for z in range(layer['min_zoom'], layer['max_native_zoom']+1) if any((OUT/str(z)).rglob('*.jpg'))]
+        layer['max_native_zoom'] = max(have) if have else None
+    layers = [layer for layer in layers if layer['max_native_zoom'] is not None]
+    if not saved or not layers:
         sys.exit('No imagery was downloaded. Check the internet connection and run again.')
     manifest = dict(source='USGS The National Map — USGSImageryOnly', license='U.S. Government public domain',
                     attribution='Imagery: USGS The National Map (public domain)',

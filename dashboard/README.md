@@ -458,6 +458,9 @@ internet needed during flights and nothing to load per mission. Download them
 3,200 tiles (roughly 80 MB) under the ignored `runtime/imagery/` folder and can
 be re-run safely; it skips tiles already saved, so an interrupted download just
 continues.
+The service's ready-made tiles stop at zoom 16 (about 2 m per pixel); for the
+two sharpest levels the script asks the same service to render each tile from
+the full-resolution photos instead, so those take a little longer.
 
 Coverage is centered on the calibration mission's planned home
 (33.72322, -85.90669): full detail (the finest the service offers, roughly 0.5–1 m per pixel) within 2.5 km,
