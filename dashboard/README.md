@@ -1,5 +1,13 @@
 # Cruza / RTIC fleet dashboard
 
+## Current mesh radio assignment — 2026-10-19
+
+**RN20 is the GCS USB radio, RN08 is assigned to quadpi, and RN03 will
+replace the Doodle Mini.** See
+[radio identities, verified RN20 links, and deployment checks](../docs/mesh-radio-roles-2026-10-19.md).
+Older topology and Alfa route instructions below describe the previous bench
+arrangement; check the current assignment before applying them.
+
 Open **http://127.0.0.1:8765** on this laptop. Both camera pictures were verified
 in the browser on 2026-10-15. The viewer is local-only and has no flight controls,
 cloud hosting, recording or external assets.
@@ -13,8 +21,9 @@ No administrator privileges are needed to launch it.
 ## How to use it
 
 - Keep the laptop's built-in Wi-Fi on its internet hotspot/VPN connection.
-- Keep Alfa Wi-Fi 2 on RN08 Handheld with its existing mesh address.
-- quadpi connects to RN03 via USB-D; RN03 and RN08 communicate across the mesh.
+- Connect the laptop by USB data to RN20, using its existing mesh address.
+- In the planned deployment, quadpi connects to RN08 via USB-D; RN03 replaces
+  the Mini. Verify the physical reassignment before accepting endpoint checks.
 - Power the cameras/Pis. Each panel reconnects independently if a link drops.
 - **Pause video** stops both additional SSH video copies immediately.
   **Resume video** restarts them. Telemetry continues while video is paused.
