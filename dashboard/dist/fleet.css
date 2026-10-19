@@ -55,9 +55,28 @@
 .log li.lvl-warning b{color:#ffd68a}
 .log li.lvl-notice b{color:#97d8bc}
 .log time{font-size:10px;color:#7f97a9;white-space:nowrap}
-.heading-arrow{pointer-events:none}
+
 .card:fullscreen .charts,.card:fullscreen .events{display:none}
 @media(max-width:720px){.charts{grid-template-columns:1fr}#alerts{flex-direction:column}}
 /* Phones: one aircraft card per row so alerts and readings are not squeezed. */
 @media(max-width:560px){.workspace #fleet{grid-template-columns:1fr}.workspace .head{min-height:0}}
 .map-options label{font-size:12px;color:#aec0cd;white-space:nowrap}.map-options label[hidden]{display:none}.map-options input{accent-color:#79d7b9;vertical-align:middle}
+/* Aircraft silhouettes: aircraft colour with a dark outline and a light halo so
+   they read on both the dark overview and the aerial photos. */
+.ac-marker{background:none;border:0}
+.ac{transition:transform .4s ease;filter:drop-shadow(0 0 1.2px #ffffffd9) drop-shadow(0 2px 3px #000a)}
+.ac-svg{display:block;overflow:visible}
+.ac-svg .hull,.ac-svg .pod{fill:var(--c);stroke:#0a1017;stroke-width:1.4;stroke-linejoin:round}
+.ac-svg .prop{stroke:#0a1017;stroke-width:1.6;stroke-linecap:round}
+.ac-svg .arm{stroke:#0a1017;stroke-width:4;stroke-linecap:round}
+.ac-svg .rotor{fill:color-mix(in srgb,var(--c) 30%,transparent);stroke:var(--c);stroke-width:1.6}
+.ac-svg .rotor.front{fill:color-mix(in srgb,var(--c) 60%,transparent)}
+.ac-svg .nose{fill:#f4f8fb;stroke:#0a1017;stroke-width:1}
+.leaflet-tooltip.aircraft-label.armed{border-color:#ffb38a;color:#ffd9c4;font-weight:600}
+@media(prefers-reduced-motion:reduce){.ac{transition:none}}
+.ac.stale{filter:drop-shadow(0 1px 2px #000a);opacity:.75}
+.ac.stale .hull,.ac.stale .pod{fill:#93a6b2;stroke:#e5edf4;stroke-dasharray:3 2}
+.ac.stale .rotor{fill:#93a6b244;stroke:#93a6b2;stroke-dasharray:3 2}
+.ac.no-heading .nose{display:none}
+.swatch-ac{display:inline-block;vertical-align:-4px;margin-right:6px}
+.swatch-ac .ac-svg{width:18px;height:18px}

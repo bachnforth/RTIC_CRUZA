@@ -479,3 +479,15 @@ domain orthoimagery, mainly USDA NAIP aerial photography). Photos can be a
 year or more old. Verification used locally generated, labelled SIMULATED tiles
 because the real service was not reachable from the development environment;
 the real download has not yet been run.
+
+## Aircraft map icons (19 October 2026)
+
+Each aircraft is drawn as a top-down silhouette in its colour that turns to
+the reported heading: Cruza as a twin-motor plane, quadpi and the RN03 Mini as
+X-frame quads, with the front rotors filled darker and a small white nose.
+The same silhouettes appear in the map legend. While an aircraft is armed its
+name label reads "· ARMED" with an orange border. A last-known position is a
+grey, dashed silhouette labelled "· last known". If a live aircraft reports
+no heading, its icon is drawn pointing north without the nose marker. This
+replaces the former circle and separate heading arrow; only the drawing
+changed, not the telemetry or position rules.
