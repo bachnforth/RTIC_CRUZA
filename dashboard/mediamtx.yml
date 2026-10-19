@@ -3,7 +3,12 @@ logDestinations: [stdout]
 api: false
 metrics: false
 pprof: false
-rtsp: false
+# Loopback-only RTSP copy for atr/atr.py (people/vehicle recognition).
+# TCP only, so no extra UDP listeners are opened.
+rtsp: true
+rtspAddress: 127.0.0.1:8554
+rtspTransports: [tcp]
+rtspEncryption: "no"
 rtmp: false
 hls: false
 srt: false

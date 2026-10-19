@@ -67,3 +67,6 @@ and the new MAVLink connection still require bench validation.
 The local [fleet dashboard](dashboard/README.md) shows Cruza and quadpi live
 video beside an interactive aircraft map and passive telemetry at
 `http://127.0.0.1:8765`, preserving their direct QGroundControl connections.
+
+[People and vehicle recognition](atr/README.md) runs on the same laptop and
+marks people and vehicles in both aircraft video feeds.
