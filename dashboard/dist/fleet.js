@@ -164,16 +164,21 @@ function renderVehicle(v) {
   const codes = new Set(alerts.map(a => a.code));
   const flag = code => codes.has(code) ? (alerts.find(a => a.code === code).level) : '';
   const sensors = v.sensors_unhealthy || [];
+  // After a link loss, keep showing the last values received, dimmed and
+  // labelled, instead of blanking them: that is when they matter most.
+  const last = !v.online && v.last_known;
+  const d = last ? {...v.last_known, position: {altitude_relative_m: v.last_known.altitude_relative_m}} : v;
+  const old = last ? 'stale' : '';
   const fields = [
-    ['Mode', v.mode ?? '—'],
-    ['Arming', v.armed === null ? '—' : v.armed ? 'ARMED' : 'Disarmed', v.armed ? 'armed' : ''],
-    ['Battery', fmt(v.battery_voltage, ' V', 2) + ' / ' + fmt(v.battery_percent, '%', 0), flag('battery')],
-    ['Relative altitude', fmt(v.position?.altitude_relative_m, ' m')],
-    ['Airspeed', fmt(v.airspeed_m_s, ' m/s'), flag('airspeed')],
-    ['Ground speed', fmt(v.groundspeed_m_s, ' m/s')],
-    ['Heading', compass(v.heading_deg)],
-    ['Climb rate', fmt(v.climb_m_s, ' m/s')],
-    ['Throttle', fmt(v.throttle_pct, '%', 0)],
+    ['Mode', d.mode ?? '—', old],
+    ['Arming', d.armed === null ? '—' : d.armed ? 'ARMED' : 'Disarmed', d.armed ? 'armed ' + old : old],
+    ['Battery', fmt(d.battery_voltage, ' V', 2) + ' / ' + fmt(d.battery_percent, '%', 0), flag('battery') || old],
+    ['Relative altitude', fmt(d.position?.altitude_relative_m, ' m'), old],
+    ['Airspeed', fmt(d.airspeed_m_s, ' m/s'), flag('airspeed') || old],
+    ['Ground speed', fmt(d.groundspeed_m_s, ' m/s'), old],
+    ['Heading', compass(d.heading_deg), old],
+    ['Climb rate', fmt(d.climb_m_s, ' m/s'), old],
+    ['Throttle', fmt(d.throttle_pct, '%', 0), old],
     ['From ' + (v.home?.reference ?? 'home'), v.home ? `${Math.round(v.home.distance_m)} m · ${compass(v.home.bearing_deg)}` : '—'],
     ['GPS', v.gps ? `Fix ${v.gps.fix_type} · ${fmt(v.gps.satellites, ' sats', 0)}` : '—', flag('gps')],
     ['Roll / pitch', fmt(v.roll_deg, '°') + ' / ' + fmt(v.pitch_deg, '°')],
@@ -183,6 +188,15 @@ function renderVehicle(v) {
   ];
   const box = c.querySelector('.metrics');
   box.replaceChildren(...fields.map(([k, val, level]) => metric(k, val, level)));
+  if (last) {
+    const note = document.createElement('p');
+    note.className = 'stale-note';
+    note.textContent = `Link lost — dimmed values were last received ${ago(v.last_known.age_seconds)} and may no longer be true.`;
+    box.prepend(note);
+  }
+  // Open the status section once when the link drops; the user can close it again.
+  if (last && !c._linkLost) c.querySelector('.telemetry').open = true;
+  c._linkLost = Boolean(last);
 
   const charts = c.querySelector('.charts');
   const history = v.history || [];
@@ -256,6 +270,8 @@ function renderBanner(fleet) {
   for (const k of Object.keys(lastBeep)) if (!keys.has(k)) delete lastBeep[k];
   banner.hidden = !all.length;
   banner.className = all.some(a => a.level === 'critical') ? 'critical' : 'warning';
+  // The browser tab's title shows alerts too, so they are visible from another tab.
+  document.title = (!all.length ? '' : all[0].level === 'critical' ? '⛔ CRITICAL · ' : '⚠ WARNING · ') + 'Cruza / RTIC Fleet';
   if (!all.length) { banner.replaceChildren(); return; }
 
   // New alerts beep once; critical ones repeat every 10 s until silenced.
@@ -344,4 +360,15 @@ document.querySelector('#toggle').onclick = () => {
   tick();
 };
 tick();
-setInterval(tick, 1500);
+// Browsers slow timers in background tabs to as little as once a minute, which
+// would delay alerts. Timers inside a worker are not slowed that way, so the
+// worker sets the pace. Without worker support, fall back to a normal timer.
+let ticker = null, fallbackTimer = null;
+const fallback = () => { fallbackTimer = fallbackTimer || setInterval(tick, 1500); };
+try {
+  ticker = new Worker('/ticker.js');
+  ticker.onmessage = tick;
+  ticker.onerror = fallback;
+} catch (e) {
+  fallback();
+}

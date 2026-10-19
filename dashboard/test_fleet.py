@@ -183,6 +183,53 @@ class FleetTests(unittest.TestCase):
         self.assertEqual(len(events),1)
         self.assertEqual(events[0]['count'],3)
 
+    def test_armed_aircraft_without_gps_messages_has_no_gps_alert(self):
+        state = VehicleState('quadpi')
+        armed = mav.MAVLink_heartbeat_message(mav.MAV_TYPE_QUADROTOR,mav.MAV_AUTOPILOT_ARDUPILOTMEGA,
+                                              1|mav.MAV_MODE_FLAG_SAFETY_ARMED,5,4,3)
+        state.consume(packet(armed),100)
+        self.assertEqual(state.snapshot(100)['alerts'],[])
+
+    def test_gps_messages_stopping_while_armed_warns(self):
+        state = VehicleState('cruza')
+        armed = mav.MAVLink_heartbeat_message(mav.MAV_TYPE_FIXED_WING,mav.MAV_AUTOPILOT_ARDUPILOTMEGA,
+                                              1|mav.MAV_MODE_FLAG_SAFETY_ARMED,10,4,3)
+        state.consume(packet(mav.MAVLink_gps_raw_int_message(0,3,0,0,0,100,100,0,0,12)),100)
+        state.consume(packet(armed),100)
+        self.assertEqual(state.snapshot(100)['alerts'],[])
+        state.consume(packet(armed),115)
+        alert = state.snapshot(115)['alerts'][0]
+        self.assertEqual((alert['code'],alert['level']),('gps','warning'))
+
+    def test_low_airspeed_alerts_on_approach_but_not_in_flare(self):
+        armed = mav.MAVLink_heartbeat_message(mav.MAV_TYPE_FIXED_WING,mav.MAV_AUTOPILOT_ARDUPILOTMEGA,
+                                              1|mav.MAV_MODE_FLAG_SAFETY_ARMED,10,4,3)
+        for altitude_mm, expected in ((30000,['airspeed']),(3000,[])):
+            state = VehicleState('cruza',limits=Limits(airspeed_min_m_s=10))
+            for t in range(100,107):
+                state.consume(packet(armed),t)
+                state.consume(packet(mav.MAVLink_gps_raw_int_message(0,3,0,0,0,100,100,0,0,12)),t)
+                state.consume(packet(mav.MAVLink_extended_sys_state_message(0,4)),t)
+                state.consume(packet(mav.MAVLink_global_position_int_message(0,337245032,-859121447,0,altitude_mm,0,0,0,65535)),t)
+                state.consume(packet(mav.MAVLink_vfr_hud_message(8,8,0,30,10,-1)),t)
+            self.assertEqual([a['code'] for a in state.snapshot(106)['alerts']],expected)
+
+    def test_last_known_values_survive_link_loss(self):
+        state = VehicleState('cruza')
+        armed = mav.MAVLink_heartbeat_message(mav.MAV_TYPE_FIXED_WING,mav.MAV_AUTOPILOT_ARDUPILOTMEGA,
+                                              1|mav.MAV_MODE_FLAG_SAFETY_ARMED,10,4,3)
+        state.consume(packet(armed),100)
+        state.consume(packet(mav.MAVLink_sys_status_message(0,0,0,0,14800,-1,55,0,0,0,0,0,0)),100)
+        state.consume(packet(mav.MAVLink_vfr_hud_message(15.5,14,270,42,60,-1.5)),100)
+        state.consume(packet(mav.MAVLink_global_position_int_message(0,337245032,-859121447,0,62000,0,0,0,65535)),100)
+        self.assertNotIn('last_known',state.snapshot(100))
+        snap = state.snapshot(120)
+        self.assertIsNone(snap['battery_voltage'])
+        last = snap['last_known']
+        self.assertEqual((last['armed'],last['mode'],last['battery_voltage'],last['battery_percent']),(True,'AUTO',14.8,55))
+        self.assertEqual((last['altitude_relative_m'],last['airspeed_m_s'],last['age_seconds']),(62,15.5,20))
+        json.dumps(snap,allow_nan=False)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -281,7 +281,8 @@ restored its independent telemetry/video copies.
 
 The default dashboard now places the shared map alongside both camera panels
 on wide screens. On narrow screens the map is compact and the two camera panels
-share a row, with aircraft status in expandable sections. **Expand dashboard**
+share a row (on phones, under 560 px wide, they stack one per row), with
+aircraft status in expandable sections. **Expand dashboard**
 expands the entire combined view, preserving both map and video. The former
 map-only fullscreen action was replaced. This is a layout-only change; camera
 and telemetry transports are unchanged.
@@ -376,17 +377,25 @@ alert beeps three tones every 10 seconds until **Silence these alerts** is
 pressed. Silencing lasts until that alert clears; a new message or an escalation
 to critical sounds again.
 
+Alerts keep updating when the dashboard is a background tab: status checks are
+paced by a small worker script (`dist/ticker.js`), whose timers browsers do not
+slow down the way they slow a hidden page's own timers. The tab title also
+starts with ⛔ CRITICAL or ⚠ WARNING while an alert is active. A minimized
+window or a sleeping laptop still stops everything, so keep the dashboard open
+and the laptop awake during flights.
+
 Alert rules (all computed on the laptop from passive telemetry):
 
 | Alert | Level | Rule |
 |---|---|---|
 | Telemetry lost | critical if last seen ARMED, else warning | No FC heartbeat for 5 s |
 | Battery low / critical | warning / critical | Voltage below the limit for 5 s straight (brief throttle sag ignored) |
-| No 3D GPS fix | critical | Only while armed |
+| No 3D GPS fix | critical | Only while armed, and only when the aircraft sends GPS messages (quadpi currently does not) |
 | Few satellites | warning | Fewer than 6 while armed |
+| GPS messages stopped | warning | Armed, and GPS messages seen earlier have not arrived for 10 s |
 | RC receiver signal lost | critical if armed | Flight controller reports the RC receiver unhealthy |
 | Sensor unhealthy | warning (attitude estimate: critical if armed) | Flight controller health flags |
-| Airspeed below minimum | warning | Armed, airborne, under the minimum for 5 s |
+| Airspeed below minimum | warning | Armed, in the air or landing above 5 m (the flare is excluded, and so is takeoff), under the minimum for 5 s |
 | Aircraft messages | ArduPilot error/critical → critical 60 s; warning → warning 30 s | Text the autopilot sends to QGC |
 
 Cruza's limits copy its flight-controller settings in the 2026-10-14 snapshot:
@@ -406,6 +415,11 @@ loss/restoration and the autopilot's text messages, with repeats collapsed
 airspeed and distance from home. History is in memory only and clears when the
 dashboard or the Pi observer restarts.
 
+When an aircraft's link drops, its card keeps the last values received (mode,
+arming, battery, altitude, speeds, heading, climb, throttle) in dimmed italics
+under a note saying how long ago they arrived, instead of blanking them. These
+are display only: alerts and the live map never use them.
+
 ### Pi observer update required for autopilot messages
 
 The autopilot's text messages (STATUSTEXT) and home position (HOME_POSITION)
@@ -423,10 +437,12 @@ sudo ./install-telemetry-observer.sh cruza    # on Cruza, from a copy of compani
 sudo ./install-telemetry-observer.sh quadpi   # on quadpi
 ```
 
-Validation: 22 fleet decoder/session tests pass, including text messages and
+Validation: 26 fleet decoder/session tests pass, including text messages and
 chunk joining, repeat collapsing, arm/mode events, lost-link escalation, the
 5-second battery rule (and that a brief sag does not alert), RC loss, distance
-from home and graph history. A local, explicitly SIMULATED harness (not in the
+from home, graph history, no GPS alert for an aircraft that sends no GPS,
+low airspeed on the landing approach but not in the flare, and last-known
+values after a link loss. A local, explicitly SIMULATED harness (not in the
 repository) served the real page with a circling Cruza and an armed quadpi that
 lost its link; desktop and phone-width screenshots, graph hover, sound toggle
 and silencing were checked with no page errors. Not yet checked against live

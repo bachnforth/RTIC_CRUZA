@@ -34,6 +34,8 @@
 .metric.warning span{color:#ffd68a}
 .metric.critical span{color:#ff9aa1;font-weight:600}
 .metric.armed span{color:#ffb38a;font-weight:600}
+.metric.stale span{color:#7f97a9;font-style:italic}
+.stale-note{grid-column:1/-1;margin:0;padding:8px 10px;background:#1b2a36;border-left:3px solid #ff5c66;border-radius:4px;color:#d6e1e9}
 .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 18px 16px}
 .chart{margin:0;position:relative;min-width:0}
 .chart figcaption{display:flex;justify-content:space-between;font-size:10px;color:#8da6b8;letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px}
@@ -56,3 +58,5 @@
 .heading-arrow{pointer-events:none}
 .card:fullscreen .charts,.card:fullscreen .events{display:none}
 @media(max-width:720px){.charts{grid-template-columns:1fr}#alerts{flex-direction:column}}
+/* Phones: one aircraft card per row so alerts and readings are not squeezed. */
+@media(max-width:560px){.workspace #fleet{grid-template-columns:1fr}.workspace .head{min-height:0}}

@@ -233,18 +233,26 @@ class VehicleState:
             add('critical', 'battery', f'Battery critical: {volts:.2f} V (limit {lim.battery_critical_v:.1f} V)')
         elif volts is not None and lim.battery_low_v and self._sustained_below('voltage', lim.battery_low_v, now):
             add('warning', 'battery', f'Battery low: {volts:.2f} V (limit {lim.battery_low_v:.1f} V)')
+        # An aircraft that never sends GPS messages (quadpi currently sends
+        # only heartbeats) has unknown GPS, not a lost fix, so it stays quiet.
         gps = s['gps']
-        if armed and (gps is None or gps['fix_type'] < 3):
+        if armed and gps and gps['fix_type'] < 3:
             add('critical', 'gps', 'No 3D GPS fix while ARMED')
         elif armed and gps and gps['satellites'] is not None and gps['satellites'] < lim.min_satellites:
             add('warning', 'gps', f'Only {gps["satellites"]} GPS satellites')
+        elif armed and gps is None and 'GPS_RAW_INT' in self.values:
+            add('warning', 'gps', 'GPS messages stopped arriving while ARMED')
         for name in s['sensors_unhealthy']:
             if name == 'RC receiver':
                 add('critical' if armed else 'warning', 'rc', 'RC receiver signal lost (RC failsafe)')
             else:
                 add('critical' if armed and name.startswith('Attitude') else 'warning',
                     'sensor', f'{name} reported unhealthy')
-        airborne = landed == 2 if landed else (s['position'] or {}).get('altitude_relative_m', 0) > 10
+        # The landing approach is where low airspeed matters most, so Landing
+        # counts until the last 5 m, where the flare deliberately slows down.
+        # Taking off is excluded: a hand launch starts below the minimum.
+        altitude = (s['position'] or {}).get('altitude_relative_m', 0)
+        airborne = landed == 2 or (landed == 4 and altitude > 5) if landed else altitude > 10
         aspd = s['airspeed_m_s']
         if lim.airspeed_min_m_s and armed and airborne and aspd is not None and \
                 self._sustained_below('airspeed', lim.airspeed_min_m_s, now):
@@ -254,6 +262,25 @@ class VehicleState:
                 add(level, 'message', text)
         alerts.sort(key=lambda a: a['level'] != 'critical')
         return alerts
+
+    def _last_known(self, hb, age_seconds):
+        """The last values received before the link dropped, for display only.
+        They are labelled with their age and never used for alerts or the map."""
+        def latest(kind):
+            entry = self.values.get(kind)
+            return entry[0] if entry else None
+        hud, pos = latest('VFR_HUD'), latest('GLOBAL_POSITION_INT')
+        pct, volts = self._voltage(latest('BATTERY_STATUS'), latest('SYS_STATUS'))
+        return dict(age_seconds=age_seconds,
+            armed=bool(hb.base_mode & mav.MAV_MODE_FLAG_SAFETY_ARMED),
+            mode=mavutil.mode_string_v10(hb),
+            battery_percent=pct, battery_voltage=volts,
+            altitude_relative_m=number(pos.relative_alt, 1000) if pos else None,
+            airspeed_m_s=number(hud.airspeed) if hud else None,
+            groundspeed_m_s=number(hud.groundspeed) if hud else None,
+            heading_deg=number(hud.heading) if hud else None,
+            climb_m_s=number(hud.climb) if hud else None,
+            throttle_pct=hud.throttle if hud and 0 <= hud.throttle <= 100 else None)
 
     def snapshot(self, now=None):
         now = time.monotonic() if now is None else now
@@ -341,6 +368,8 @@ class VehicleState:
             elif hb and self.link_lost:
                 self.link_lost = False
                 self._event(now, 'notice', 'Telemetry restored')
+            if hb_entry and not hb:
+                s['last_known'] = self._last_known(hb_entry[0], age('HEARTBEAT'))
             s['alerts'] = self._alerts(now, s, hb_entry, sys_status, landed)
             s['events'] = [{'age_seconds':round(now-t, 1), 'level':level, 'text':text, 'count':count}
                            for t, level, text, count in reversed(self.events)]

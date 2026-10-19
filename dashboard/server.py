@@ -267,7 +267,7 @@ class Handler(BaseHTTPRequestHandler):
                                         error='Mini telemetry/video source not configured')]),
                                   allow_nan=False).encode()
             content_type = 'application/json'
-        elif path in ('/', '/index.html','/fleet.js','/fleet.css','/fleet-map.js',
+        elif path in ('/', '/index.html','/fleet.js','/ticker.js','/fleet.css','/fleet-map.js',
                       '/leaflet.js','/leaflet.css','/world.geojson','/us-states.geojson','/map-state.js',
                       '/alabama-map.js','/al-counties.geojson','/al-places.geojson','/al-roads.geojson'):
             name = 'index.html' if path == '/' else path.lstrip('/')
