@@ -1,5 +1,16 @@
 # Build status — 2026-10-08
 
+
+## Dashboard alerts and readings — 2026-10-18
+
+- Fleet dashboard now shows an alert banner (optional sound), airspeed, heading,
+  climb, throttle, distance from home, sensor health, altitude/airspeed graphs,
+  a message log and map heading arrows. Rules and limits:
+  [dashboard README](../dashboard/README.md#alerts-extra-readings-and-graphs-18-october-2026).
+- Tested with simulated telemetry only. Laptop restart of the dashboard and the
+  Pi observer update (for autopilot text messages) are pending; no aircraft,
+  FC parameter or service was changed.
+
 ## QGC over LTE continuation — 2026-10-14
 
 - [Handover for the next chat](qgc-lte-handover-2026-10-14.md) records verified

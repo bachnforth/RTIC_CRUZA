@@ -362,3 +362,72 @@ and major interstate routes. Browser checks verified county/city/route labels at
 closer zoom, removal of county lines/names independently of roads, and deeper
 zoom detail. Camera panels remain in the combined layout. Restarting the laptop
 viewer to add static assets did not restart an aircraft service.
+
+## Alerts, extra readings and graphs (18 October 2026)
+
+A banner under the page header lists every active alert across the fleet,
+critical first (red, ⛔) then warnings (amber, ⚠). Each aircraft card repeats
+its own alerts above the video and highlights the affected reading. Labels and
+icons accompany the colors, so state is never shown by color alone.
+
+**Sound alerts** is off when the page opens, because browsers only allow sound
+after a click. Turn it on once per session. A new warning beeps once; a critical
+alert beeps three tones every 10 seconds until **Silence these alerts** is
+pressed. Silencing lasts until that alert clears; a new message or an escalation
+to critical sounds again.
+
+Alert rules (all computed on the laptop from passive telemetry):
+
+| Alert | Level | Rule |
+|---|---|---|
+| Telemetry lost | critical if last seen ARMED, else warning | No FC heartbeat for 5 s |
+| Battery low / critical | warning / critical | Voltage below the limit for 5 s straight (brief throttle sag ignored) |
+| No 3D GPS fix | critical | Only while armed |
+| Few satellites | warning | Fewer than 6 while armed |
+| RC receiver signal lost | critical if armed | Flight controller reports the RC receiver unhealthy |
+| Sensor unhealthy | warning (attitude estimate: critical if armed) | Flight controller health flags |
+| Airspeed below minimum | warning | Armed, airborne, under the minimum for 5 s |
+| Aircraft messages | ArduPilot error/critical → critical 60 s; warning → warning 30 s | Text the autopilot sends to QGC |
+
+Cruza's limits copy its flight-controller settings in the 2026-10-14 snapshot:
+BATT_LOW_VOLT 14.0 V, BATT_CRT_VOLT 13.2 V and AIRSPEED_MIN 10 m/s. They are
+the `LIMITS` table near the top of `server.py`; change them there if those
+parameters change. quadpi's battery limits are unknown, so its battery and
+airspeed checks are off. The dashboard only warns; the aircraft's own failsafes
+are unchanged and remain the actual protection.
+
+New readings on each card: airspeed, heading, climb rate, throttle, distance and
+direction from home (from HOME_POSITION, or the first armed GPS position when
+home has not been seen), landed state, pre-arm status and sensor health. Two
+five-minute graphs show altitude and airspeed; hover a graph for a value. A
+**Messages** list keeps the last 30 events: arm/disarm, mode changes, telemetry
+loss/restoration and the autopilot's text messages, with repeats collapsed
+(×N). The map shows a heading arrow on live aircraft, and its popup adds
+airspeed and distance from home. History is in memory only and clears when the
+dashboard or the Pi observer restarts.
+
+### Pi observer update required for autopilot messages
+
+The autopilot's text messages (STATUSTEXT) and home position (HOME_POSITION)
+only reach the laptop after the updated `companion/telemetry-tap.py` is
+installed on each Pi. Until then everything else above works, but the
+Messages list shows only laptop-detected events and distance uses the launch
+point. The updated observer forwards those two extra message types, passes
+every text message rather than thinning them to one per half second, and caps
+text at 20 messages per 10 s. It still only watches outgoing packets and cannot
+send anything. Install it with the existing guarded installer, which backs up
+the current files and restarts only the optional observer service:
+
+```sh
+sudo ./install-telemetry-observer.sh cruza    # on Cruza, from a copy of companion/
+sudo ./install-telemetry-observer.sh quadpi   # on quadpi
+```
+
+Validation: 22 fleet decoder/session tests pass, including text messages and
+chunk joining, repeat collapsing, arm/mode events, lost-link escalation, the
+5-second battery rule (and that a brief sag does not alert), RC loss, distance
+from home and graph history. A local, explicitly SIMULATED harness (not in the
+repository) served the real page with a circling Cruza and an armed quadpi that
+lost its link; desktop and phone-width screenshots, graph hover, sound toggle
+and silencing were checked with no page errors. Not yet checked against live
+aircraft.
