@@ -447,3 +447,32 @@ repository) served the real page with a circling Cruza and an armed quadpi that
 lost its link; desktop and phone-width screenshots, graph hover, sound toggle
 and silencing were checked with no page errors. Not yet checked against live
 aircraft.
+
+## Offline aerial imagery of the flying field (19 October 2026)
+
+The map can show aerial photos of the area around the flying field, with no
+internet needed during flights and nothing to load per mission. Download them
+**once** while the laptop has internet: double-click
+`Download field imagery.cmd` in this folder (or run
+`python dashboard/download-imagery.py`). It takes a few minutes, saves about
+3,200 tiles (roughly 80 MB) under the ignored `runtime/imagery/` folder and can
+be re-run safely; it skips tiles already saved, so an interrupted download just
+continues.
+
+Coverage is centered on the calibration mission's planned home
+(33.72322, -85.90669): full detail (the finest the service offers, roughly 0.5–1 m per pixel) within 2.5 km,
+medium detail within 6 km and coarse context within 15 km. For a different
+field, pass `--lat`, `--lon` and optionally `--radius-km`.
+
+Once downloaded, the dashboard opens on the field instead of the U.S. overview,
+**Flying field** returns there, and **Aerial imagery (offline)** under the map
+hides or shows the photos. County, road and aircraft layers draw on top. The
+photos sit above the optional street map, so untick imagery to see streets.
+The imagery is served by the laptop dashboard itself; the page makes no
+external request for it.
+
+Source: USGS The National Map, USGSImageryOnly service (U.S. Government public
+domain orthoimagery, mainly USDA NAIP aerial photography). Photos can be a
+year or more old. Verification used locally generated, labelled SIMULATED tiles
+because the real service was not reachable from the development environment;
+the real download has not yet been run.

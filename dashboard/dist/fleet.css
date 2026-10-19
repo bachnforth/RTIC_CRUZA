@@ -60,3 +60,4 @@
 @media(max-width:720px){.charts{grid-template-columns:1fr}#alerts{flex-direction:column}}
 /* Phones: one aircraft card per row so alerts and readings are not squeezed. */
 @media(max-width:560px){.workspace #fleet{grid-template-columns:1fr}.workspace .head{min-height:0}}
+.map-options label{font-size:12px;color:#aec0cd;white-space:nowrap}.map-options label[hidden]{display:none}.map-options input{accent-color:#79d7b9;vertical-align:middle}

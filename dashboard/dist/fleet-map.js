@@ -7,7 +7,7 @@ map.createPane('stateBorders').style.zIndex=300;
 map.createPane('stateLabels').style.zIndex=350;
 map.getPane('stateLabels').style.pointerEvents='none';
 L.control.scale({imperial:false}).addTo(map);
-const layers={},follow=document.querySelector('#follow-fleet');let latest=[],fitting=false,streets=null,countries=null,overviewMode=true;
+const layers={},follow=document.querySelector('#follow-fleet');let latest=[],fitting=false,streets=null,countries=null,overviewMode=true,field=null;
 map.on('dragstart zoomstart',e=>{if(!fitting && (e.type==='dragstart'||e.originalEvent)){follow.checked=false;overviewMode=false;}});
 map.on('zoomstart',()=>{if(!fitting){follow.checked=false;overviewMode=false;}});
 new ResizeObserver(()=>{map.invalidateSize({pan:false});if(overviewMode)usOverview(overviewMode);}).observe(document.querySelector('#map'));
@@ -31,12 +31,24 @@ fetch('/us-states.geojson').then(r=>{if(!r.ok)throw Error();return r.json();}).t
   const b=l.getBounds();stateLabels.push({marker,postal:p.postal,large:(b.getEast()-b.getWest())*(b.getNorth()-b.getSouth())});
  }}).addTo(map);showStateLabels();
 }).catch(()=>{document.querySelector('#map-layer-note').textContent='State outlines unavailable. Aircraft positions and the world overview still work.';});
-function usOverview(region='us'){overviewMode=region;fitting=true;try{map.fitBounds(region==='alabama'?AlabamaMap.bounds:[[24,-125],[50,-66]],{padding:[12,12],animate:false});}finally{fitting=false;}}
+function usOverview(region='us'){overviewMode=region;fitting=true;try{map.fitBounds(region==='field'&&field?field:region==='alabama'?AlabamaMap.bounds:[[24,-125],[50,-66]],{padding:[12,12],animate:false});}finally{fitting=false;}}
 // The overview is a map location, never an inferred aircraft position.
 usOverview();
 document.querySelector('#us-view').onclick=()=>{follow.checked=false;usOverview();};
 document.querySelector('#al-view').onclick=()=>{follow.checked=false;usOverview('alabama');};
 AlabamaMap.attach(map);
+// Offline aerial imagery saved once by download-imagery.py (USGS, public domain).
+// Coarse wide rings sit under the detailed one; no request leaves this laptop.
+map.createPane('imagery').style.zIndex=250;
+fetch('/imagery/manifest.json').then(r=>{if(!r.ok)throw Error();return r.json();}).then(m=>{
+ const group=L.layerGroup(m.layers.map(l=>L.tileLayer('/imagery/{z}/{x}/{y}',{pane:'imagery',bounds:l.bounds,minZoom:l.min_zoom,maxNativeZoom:l.max_native_zoom,maxZoom:19,keepBuffer:1}))).addTo(map);
+ map.attributionControl.addAttribution(m.attribution);
+ field=L.latLngBounds(m.layers[m.layers.length-1].bounds);
+ const button=document.querySelector('#field-view'),toggle=document.querySelector('#imagery');
+ button.hidden=false;button.onclick=()=>{follow.checked=false;usOverview('field');};
+ toggle.closest('label').hidden=false;toggle.onchange=()=>{if(toggle.checked)group.addTo(map);else map.removeLayer(group);};
+ if(overviewMode==='us')usOverview('field');
+}).catch(()=>{});
 function fit(){const points=latest.map(v=>FleetMapState.positionState(v)).filter(s=>s.position).map(s=>[s.position.latitude,s.position.longitude]);if(!points.length)return;overviewMode=false;fitting=true;try{map.fitBounds(L.latLngBounds(points),{padding:[60,50],maxZoom:16,animate:false});}finally{fitting=false;}}
 function focus(v){const s=FleetMapState.positionState(v);if(!s.position)return;overviewMode=false;follow.checked=false;map.setView([s.position.latitude,s.position.longitude],Math.max(map.getZoom(),16),{animate:false});layers[v.name]?.marker?.openPopup();}
 function popup(v,s){const box=document.createElement('div'),title=document.createElement('strong');title.textContent=titles[v.name];box.append(title,document.createElement('br'));box.append(document.createTextNode(s.label),document.createElement('br'));box.append(document.createTextNode(s.position.latitude.toFixed(6)+', '+s.position.longitude.toFixed(6)));if(s.kind==='live'&&Number.isFinite(s.position.altitude_relative_m)){box.append(document.createElement('br'),document.createTextNode('Relative altitude '+s.position.altitude_relative_m.toFixed(1)+' m'));}if(s.kind==='live'&&Number.isFinite(v.airspeed_m_s)){box.append(document.createElement('br'),document.createTextNode('Airspeed '+v.airspeed_m_s.toFixed(1)+' m/s'));}if(s.kind==='live'&&v.home){box.append(document.createElement('br'),document.createTextNode(Math.round(v.home.distance_m)+' m from '+v.home.reference));}return box;}

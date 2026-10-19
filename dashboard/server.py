@@ -7,6 +7,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
+import re
 import signal
 import shlex
 import socket
@@ -24,6 +25,8 @@ LIMITS = {'cruza': Limits(battery_low_v=14.0, battery_critical_v=13.2, airspeed_
           'quadpi': Limits()}
 
 HERE = Path(__file__).resolve().parent
+IMAGERY = HERE/'runtime'/'imagery'
+IMAGERY_PATH = re.compile(r'/imagery/(manifest\.json|\d{1,2}/\d{1,7}/\d{1,7})')
 KEY = Path.home()/'.ssh'/'id_ed25519_rpi'
 STOP = threading.Event()
 last_viewer = 0
@@ -274,6 +277,18 @@ class Handler(BaseHTTPRequestHandler):
             raw = (HERE/'dist'/name).read_bytes()
             content_type = {'js':'application/javascript','css':'text/css',
                             'geojson':'application/geo+json'}.get(name.rsplit('.',1)[-1], 'text/html; charset=utf-8')
+        elif IMAGERY_PATH.fullmatch(path):
+            # Offline field imagery saved by download-imagery.py; the strict
+            # pattern above keeps requests inside runtime/imagery/.
+            file = IMAGERY/path[len('/imagery/'):]
+            if path != '/imagery/manifest.json':
+                file = file.with_suffix('.jpg')
+            if not file.is_file():
+                self.send_error(404)
+                return
+            raw = file.read_bytes()
+            content_type = 'application/json' if file.suffix == '.json' else \
+                'image/png' if raw.startswith(b'\x89PNG') else 'image/jpeg'
         else:
             self.send_error(404)
             return
