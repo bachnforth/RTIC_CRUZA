@@ -1,0 +1,28 @@
+[Unit]
+Description=Cruza cooperative path connectivity evidence
+After=local-fs.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=ebach
+Group=ebach
+ExecStart=/usr/bin/python3 /opt/cruza-path-health/path-health.py
+Restart=always
+RestartSec=10
+TimeoutStopSec=20
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ebach/cruza-path-health
+PrivateTmp=yes
+UMask=0077
+Nice=10
+CPUWeight=10
+MemoryMax=64M
+TasksMax=20
+
+[Install]
+WantedBy=multi-user.target

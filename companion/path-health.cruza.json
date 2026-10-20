@@ -1,0 +1,7 @@
+{
+  "node": "cruza",
+  "targets": [
+    {"name": "gateway-vpn", "source_ip": "100.100.0.58", "peer_ip": "100.100.0.23", "network": "100.64.0.0/10"}
+  ],
+  "services": ["cruza-router", "cruza-video", "cruza-observations", "tailscaled"]
+}

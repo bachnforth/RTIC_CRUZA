@@ -1,0 +1,7 @@
+{
+  "node": "quadpi",
+  "targets": [
+    {"name": "gateway-mesh", "source_ip": "10.223.79.20", "peer_ip": "10.223.58.11", "network": "10.223.0.0/16"}
+  ],
+  "services": ["picam-stream", "mesh-logger", "safety-mavlink-filter"]
+}

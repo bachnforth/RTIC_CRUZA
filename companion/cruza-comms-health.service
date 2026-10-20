@@ -1,0 +1,35 @@
+[Unit]
+Description=Cruza continuous communications health evidence
+After=local-fs.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=ebach
+Group=ebach
+SupplementaryGroups=systemd-journal
+ExecStart=/usr/bin/python3 /opt/cruza-comms-health/comms-health.py
+Restart=always
+RestartSec=10
+TimeoutStopSec=45
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ebach/cruza-comms-health
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+UMask=0077
+Nice=10
+CPUWeight=10
+MemoryMax=96M
+TasksMax=20
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
