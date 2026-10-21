@@ -1,13 +1,13 @@
 'use strict';
 (function(){
-const titles={cruza:'Cruza',quadpi:'quadpi',rn03:'RN03 aircraft'},colors={cruza:'#7ce1ba',quadpi:'#7dbcf4',rn03:'#d3a9ed'};
+const titles={cruza:'Cruza',quadpi:'quadpi',rn03:'TFW drone'},colors={cruza:'#7ce1ba',quadpi:'#7dbcf4',rn03:'#d3a9ed'};
 const map=L.map('map',{minZoom:1,maxZoom:19,worldCopyJump:true,scrollWheelZoom:false}).setView([39,-98],3);
 map.createPane('basemap').style.zIndex=240;
 map.createPane('stateBorders').style.zIndex=300;
 map.createPane('stateLabels').style.zIndex=350;
 map.getPane('stateLabels').style.pointerEvents='none';
 L.control.scale({imperial:false}).addTo(map);
-const layers={},follow=document.querySelector('#follow-fleet');let latest=[],fitting=false,streets=null,countries=null,overviewMode=true;
+const layers={},follow=document.querySelector('#follow-fleet');let latest=[],fitting=false,streets=null,countries=null,overviewMode=true,field=null;
 map.on('dragstart zoomstart',e=>{if(!fitting && (e.type==='dragstart'||e.originalEvent)){follow.checked=false;overviewMode=false;}});
 map.on('zoomstart',()=>{if(!fitting){follow.checked=false;overviewMode=false;}});
 new ResizeObserver(()=>{map.invalidateSize({pan:false});if(overviewMode)usOverview(overviewMode);}).observe(document.querySelector('#map'));
@@ -31,23 +31,35 @@ fetch('/us-states.geojson').then(r=>{if(!r.ok)throw Error();return r.json();}).t
   const b=l.getBounds();stateLabels.push({marker,postal:p.postal,large:(b.getEast()-b.getWest())*(b.getNorth()-b.getSouth())});
  }}).addTo(map);showStateLabels();
 }).catch(()=>{document.querySelector('#map-layer-note').textContent='State outlines unavailable. Aircraft positions and the world overview still work.';});
-function usOverview(region='us'){overviewMode=region;fitting=true;try{map.fitBounds(region==='alabama'?AlabamaMap.bounds:[[24,-125],[50,-66]],{padding:[12,12],animate:false});}finally{fitting=false;}}
+function usOverview(region='us'){overviewMode=region;fitting=true;try{map.fitBounds(region==='field'&&field?field:region==='alabama'?AlabamaMap.bounds:[[24,-125],[50,-66]],{padding:[12,12],animate:false});}finally{fitting=false;}}
 // The overview is a map location, never an inferred aircraft position.
 usOverview();
 document.querySelector('#us-view').onclick=()=>{follow.checked=false;usOverview();};
 document.querySelector('#al-view').onclick=()=>{follow.checked=false;usOverview('alabama');};
 AlabamaMap.attach(map);
+// Offline aerial imagery saved once by download-imagery.py (USGS, public domain).
+// Coarse wide rings sit under the detailed one; no request leaves this laptop.
+map.createPane('imagery').style.zIndex=250;
+fetch('/imagery/manifest.json').then(r=>{if(!r.ok)throw Error();return r.json();}).then(m=>{
+ const group=L.layerGroup(m.layers.map(l=>L.tileLayer('/imagery/{z}/{x}/{y}',{pane:'imagery',bounds:l.bounds,minZoom:l.min_zoom,maxNativeZoom:l.max_native_zoom,maxZoom:19,keepBuffer:1}))).addTo(map);
+ map.attributionControl.addAttribution(m.attribution);
+ field=L.latLngBounds(m.layers[m.layers.length-1].bounds);
+ const button=document.querySelector('#field-view'),toggle=document.querySelector('#imagery');
+ button.hidden=false;button.onclick=()=>{follow.checked=false;usOverview('field');};
+ toggle.closest('label').hidden=false;toggle.onchange=()=>{if(toggle.checked)group.addTo(map);else map.removeLayer(group);};
+ if(overviewMode==='us')usOverview('field');
+}).catch(()=>{});
 function fit(){const points=latest.map(v=>FleetMapState.positionState(v)).filter(s=>s.position).map(s=>[s.position.latitude,s.position.longitude]);if(!points.length)return;overviewMode=false;fitting=true;try{map.fitBounds(L.latLngBounds(points),{padding:[60,50],maxZoom:16,animate:false});}finally{fitting=false;}}
 function focus(v){const s=FleetMapState.positionState(v);if(!s.position)return;overviewMode=false;follow.checked=false;map.setView([s.position.latitude,s.position.longitude],Math.max(map.getZoom(),16),{animate:false});layers[v.name]?.marker?.openPopup();}
-function popup(v,s){const box=document.createElement('div'),title=document.createElement('strong');title.textContent=titles[v.name];box.append(title,document.createElement('br'));box.append(document.createTextNode(s.label),document.createElement('br'));box.append(document.createTextNode(s.position.latitude.toFixed(6)+', '+s.position.longitude.toFixed(6)));if(s.kind==='live'&&Number.isFinite(s.position.altitude_relative_m)){box.append(document.createElement('br'),document.createTextNode('Relative altitude '+s.position.altitude_relative_m.toFixed(1)+' m'));}return box;}
+function popup(v,s){const box=document.createElement('div'),title=document.createElement('strong');title.textContent=titles[v.name];box.append(title,document.createElement('br'));box.append(document.createTextNode(s.label),document.createElement('br'));box.append(document.createTextNode(s.position.latitude.toFixed(6)+', '+s.position.longitude.toFixed(6)));if(s.kind==='live'&&Number.isFinite(s.position.altitude_relative_m)){box.append(document.createElement('br'),document.createTextNode('Relative altitude '+s.position.altitude_relative_m.toFixed(1)+' m'));}if(s.kind==='live'&&Number.isFinite(v.airspeed_m_s)){box.append(document.createElement('br'),document.createTextNode('Airspeed '+v.airspeed_m_s.toFixed(1)+' m/s'));}if(s.kind==='live'&&v.home){box.append(document.createElement('br'),document.createTextNode(Math.round(v.home.distance_m)+' m from '+v.home.reference));}return box;}
 function update(fleet){latest=fleet;const legend=document.querySelector('#map-legend');legend.replaceChildren();let live=0,last=0;
  for(const id of Object.keys(titles)){
   const v=fleet.find(v=>v.name===id)||{name:id,configured:id!=='rn03',online:false};const s=FleetMapState.positionState(v);const group=layers[id]||(layers[id]={});const color=colors[id];
   if(s.position){const loc=[s.position.latitude,s.position.longitude];const active=s.kind==='live';live+=active?1:0;last+=active?0:1;
    if(!group.marker){group.marker=L.circleMarker(loc,{radius:9,weight:3}).addTo(map);group.marker.bindTooltip('',{permanent:true,direction:'top',offset:[0,-10],className:'aircraft-label'});}
    group.marker.setLatLng(loc).setStyle({color:active?color:'#93a6b2',fillColor:active?color:'#243b49',fillOpacity:active?.9:.5,dashArray:active?null:'4 4'});
-   group.marker.setTooltipContent(titles[id]+(active?'':' · last known'));group.marker.bindPopup(popup(v,s));group.marker.bringToFront();
-  }else if(group.marker){map.removeLayer(group.marker);group.marker=null;}
+   group.marker.setTooltipContent(titles[id]+(active?'':' · last known'));group.marker.bindPopup(popup(v,s));group.marker.bringToFront();const hdg=active&&Number.isFinite(v.heading_deg)?v.heading_deg:null;if(hdg!==null){const html=`<svg viewBox="-20 -20 40 40" width="40" height="40" style="transform:rotate(${hdg}deg)"><path d="M0 -19 L6 -9 L-6 -9 Z" fill="${color}" stroke="#0a1017" stroke-width="1.5"/></svg>`;if(!group.arrow)group.arrow=L.marker(loc,{interactive:false,keyboard:false,icon:L.divIcon({className:'heading-arrow',html,iconSize:[40,40],iconAnchor:[20,20]})}).addTo(map);else{group.arrow.setLatLng(loc);group.arrow.getElement()&&(group.arrow.getElement().innerHTML=html);}}else if(group.arrow){map.removeLayer(group.arrow);group.arrow=null;}
+  }else if(group.marker){map.removeLayer(group.marker);group.marker=null;if(group.arrow){map.removeLayer(group.arrow);group.arrow=null;}}
   const trail=s.track.map(p=>[p.latitude,p.longitude]);if(trail.length>1){if(!group.trail)group.trail=L.polyline(trail,{color,weight:2,opacity:.6,interactive:false}).addTo(map);else group.trail.setLatLngs(trail);}else if(group.trail){map.removeLayer(group.trail);group.trail=null;}
   const button=document.createElement('button');button.className='map-aircraft';button.disabled=!s.position;const title=document.createElement('strong'),swatch=document.createElement('i');swatch.className='swatch';swatch.style.background=color;title.append(swatch,document.createTextNode(titles[id]));const text=document.createElement('span');text.textContent=s.label;button.append(title,text);if(s.position){const coords=document.createElement('span');coords.textContent=s.position.latitude.toFixed(5)+', '+s.position.longitude.toFixed(5);button.append(coords);button.onclick=()=>focus(v);}legend.append(button);
  }

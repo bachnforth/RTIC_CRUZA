@@ -7,6 +7,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
+import re
 import signal
 import shlex
 import socket
@@ -14,9 +15,18 @@ import struct
 import subprocess
 import threading
 import time
-from fleet import VehicleState
+from fleet import Limits, VehicleState
+
+# Alert thresholds. Cruza's values copy its own flight-controller settings
+# (BATT_LOW_VOLT 14.0, BATT_CRT_VOLT 13.2, AIRSPEED_MIN 10 in the 2026-10-14
+# snapshot); update them here if those parameters change. quadpi's battery
+# limits are unknown, so its battery and airspeed checks stay off.
+LIMITS = {'cruza': Limits(battery_low_v=14.0, battery_critical_v=13.2, airspeed_min_m_s=10),
+          'quadpi': Limits()}
 
 HERE = Path(__file__).resolve().parent
+IMAGERY = HERE/'runtime'/'imagery'
+IMAGERY_PATH = re.compile(r'/imagery/(manifest\.json|\d{1,2}/\d{1,7}/\d{1,7})')
 KEY = Path.home()/'.ssh'/'id_ed25519_rpi'
 STOP = threading.Event()
 last_viewer = 0
@@ -117,11 +127,98 @@ class Feed:
                 STOP.wait(3)
 
 
+# Adapted from partner branch lte-bvlos-flight-review, commit 91ee49b.
+def split_frames(buffer):
+    """Split a MAVLink byte stream into whole frames; return the unread tail."""
+    frames, pos = [], 0
+    while pos < len(buffer):
+        stx = buffer[pos]
+        if stx == 0xFD:
+            if len(buffer)-pos < 12:
+                break
+            size = 12+buffer[pos+1]+(13 if buffer[pos+2] & 1 else 0)
+        elif stx == 0xFE:
+            if len(buffer)-pos < 8:
+                break
+            size = 8+buffer[pos+1]
+        else:
+            pos += 1
+            continue
+        if len(buffer)-pos < size:
+            break
+        frames.append(bytes(buffer[pos:pos+size]))
+        pos += size
+    return frames, buffer[pos:]
+
+
+class DirectTelemetry:
+    """Reads RN03's existing mavlink-router TCP server. It never writes to the
+    socket, so the flight controller gains no GCS and no stream is requested."""
+    def __init__(self, name, host, port):
+        self.name, self.host, self.port = name, host, port
+        self.state = VehicleState(name, limits=LIMITS.get(name))
+        self.sock = None
+        self.lock = threading.Lock()
+        self.error = ''
+        self.last_observer = 0
+        self.thread = threading.Thread(target=self.run, daemon=True)
+
+    def disconnect(self):
+        with self.lock:
+            if self.sock:
+                self.sock.close()
+                self.sock = None
+
+    def snapshot(self):
+        data = self.state.snapshot()
+        data['observer_connected'] = time.monotonic()-self.last_observer < 12
+        data['error'] = self.error
+        return data
+
+    def run(self):
+        while not STOP.is_set():
+            if not telemetry_active():
+                self.disconnect()
+                STOP.wait(.5)
+                continue
+            buffer = bytearray()
+            try:
+                sock = socket.create_connection((self.host, self.port), timeout=6)
+                sock.settimeout(1)
+                with self.lock:
+                    self.sock = sock
+                # A fresh token per connection drops values from the old session.
+                self.state.reset_boot(f'tcp:{self.host}:{time.time():.0f}')
+                self.error = ''
+                while not STOP.is_set() and telemetry_active():
+                    try:
+                        raw = sock.recv(4096)
+                    except socket.timeout:
+                        continue
+                    if not raw:
+                        raise EOFError('Telemetry connection closed')
+                    buffer += raw
+                    if len(buffer) > 8192:
+                        del buffer[:-2048]
+                    frames, buffer = split_frames(buffer)
+                    buffer = bytearray(buffer)
+                    for frame in frames:
+                        self.state.consume(frame)
+                    if frames:
+                        self.last_observer = time.monotonic()
+            except (EOFError, OSError, ValueError) as exc:
+                self.error = getattr(exc, 'strerror', None) or str(exc)
+            finally:
+                self.disconnect()
+            STOP.wait(3)
+
+
 class Telemetry:
     """Receives bounded JSON via SSH; cannot write bytes to an aircraft socket."""
-    def __init__(self, name, host, alias, port):
+    def __init__(self, name, host, alias, port, user='ebach'):
         self.name, self.host, self.alias, self.port = name, host, alias, port
-        self.state = VehicleState(name)
+        self.user = user
+        self.state = VehicleState(name, limits=LIMITS.get(name))
         self.proc = None
         self.lock = threading.Lock()
         self.error = ''
@@ -148,7 +245,7 @@ class Telemetry:
             argv = ['ssh','-T','-i',str(KEY),'-o','IdentitiesOnly=yes','-o','BatchMode=yes',
                     '-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=6',
                     '-o','ServerAliveInterval=5','-o','ServerAliveCountMax=2',
-                    '-o','LogLevel=ERROR','-o','HostKeyAlias='+self.alias,'ebach@'+self.host,
+                    '-o','LogLevel=ERROR','-o','HostKeyAlias='+self.alias,self.user+'@'+self.host,
                     'python3 -c '+shlex.quote((HERE.parent/'companion'/'telemetry-session.py').read_text(encoding='utf-8-sig'))+' '+str(self.port)]
             reader = lease_thread = None
             lease_stop = threading.Event()
@@ -255,12 +352,10 @@ class Handler(BaseHTTPRequestHandler):
                 last_telemetry_viewer = time.monotonic()
             raw = json.dumps(dict(active=active(), media_running=media.poll() is None,
                                   feeds=[feed.snapshot() for feed in feeds],
-                                  fleet=[source.snapshot() for source in telemetry]+
-                                  [dict(name='rn03',configured=False,online=False,
-                                        error='Mini telemetry/video source not configured')]),
+                                  fleet=[source.snapshot() for source in telemetry]),
                                   allow_nan=False).encode()
             content_type = 'application/json'
-        elif path in ('/', '/index.html','/fleet.js','/fleet.css','/fleet-map.js',
+        elif path in ('/', '/index.html','/fleet.js','/ticker.js','/fleet.css','/fleet-map.js',
                       '/leaflet.js','/leaflet.css','/world.geojson','/us-states.geojson','/map-state.js',
                       '/alabama-map.js','/al-counties.geojson','/al-places.geojson','/al-roads.geojson',
                       '/command-preview.js'):
@@ -268,6 +363,18 @@ class Handler(BaseHTTPRequestHandler):
             raw = (HERE/'dist'/name).read_bytes()
             content_type = {'js':'application/javascript','css':'text/css',
                             'geojson':'application/geo+json'}.get(name.rsplit('.',1)[-1], 'text/html; charset=utf-8')
+        elif IMAGERY_PATH.fullmatch(path):
+            # Offline field imagery saved by download-imagery.py; the strict
+            # pattern above keeps requests inside runtime/imagery/.
+            file = IMAGERY/path[len('/imagery/'):]
+            if path != '/imagery/manifest.json':
+                file = file.with_suffix('.jpg')
+            if not file.is_file():
+                self.send_error(404)
+                return
+            raw = file.read_bytes()
+            content_type = 'application/json' if file.suffix == '.json' else \
+                'image/png' if raw.startswith(b'\x89PNG') else 'image/jpeg'
         else:
             self.send_error(404)
             return
@@ -316,7 +423,8 @@ def main():
     for feed in feeds:
         feed.thread.start()
     telemetry = [Telemetry('cruza','100.100.0.58','10.229.125.15',15610),
-                 Telemetry('quadpi','10.223.79.20','10.223.79.20',15611)]
+                 Telemetry('quadpi','10.223.79.20','10.223.79.20',15611),
+                 DirectTelemetry('rn03','100.100.0.6',5760)]
     for source in telemetry:
         source.thread.start()
     threading.Thread(target=supervisor, daemon=True).start()

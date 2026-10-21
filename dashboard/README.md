@@ -19,14 +19,6 @@ There is **no command API, MAVLink sender, transport, queue or saved command**.
 Nothing in this preview transmits a flight command or changes the Pi bridge.
 Selections are discarded on reload. Video and passive telemetry are unchanged.
 
-## Current mesh radio assignment — 2026-10-19
-
-**RN20 is the GCS USB radio, RN08 is assigned to quadpi, and RN03 will
-replace the Doodle Mini.** See
-[radio identities, verified RN20 links, and deployment checks](../docs/mesh-radio-roles-2026-10-19.md).
-Older topology and Alfa route instructions below describe the previous bench
-arrangement; check the current assignment before applying them.
-
 Open **http://127.0.0.1:8765** on this laptop. Both camera pictures were verified
 in the browser on 2026-10-15. The viewer is local-only and has no flight controls,
 cloud hosting, recording or external assets.
@@ -40,9 +32,8 @@ No administrator privileges are needed to launch it.
 ## How to use it
 
 - Keep the laptop's built-in Wi-Fi on its internet hotspot/VPN connection.
-- Connect the laptop by USB data to RN20, using its existing mesh address.
-- In the planned deployment, quadpi connects to RN08 via USB-D; RN03 replaces
-  the Mini. Verify the physical reassignment before accepting endpoint checks.
+- Keep Alfa Wi-Fi 2 on RN08 Handheld with its existing mesh address.
+- quadpi connects to RN03 via USB-D; RN03 and RN08 communicate across the mesh.
 - Power the cameras/Pis. Each panel reconnects independently if a link drops.
 - **Pause video** stops both additional SSH video copies immediately.
   **Resume video** restarts them. Telemetry continues while video is paused.
@@ -309,7 +300,8 @@ restored its independent telemetry/video copies.
 
 The default dashboard now places the shared map alongside both camera panels
 on wide screens. On narrow screens the map is compact and the two camera panels
-share a row, with aircraft status in expandable sections. **Expand dashboard**
+share a row (on phones, under 560 px wide, they stack one per row), with
+aircraft status in expandable sections. **Expand dashboard**
 expands the entire combined view, preserving both map and video. The former
 map-only fullscreen action was replaced. This is a layout-only change; camera
 and telemetry transports are unchanged.
@@ -390,3 +382,149 @@ and major interstate routes. Browser checks verified county/city/route labels at
 closer zoom, removal of county lines/names independently of roads, and deeper
 zoom detail. Camera panels remain in the combined layout. Restarting the laptop
 viewer to add static assets did not restart an aircraft service.
+
+## Alerts, extra readings and graphs (18 October 2026)
+
+A banner under the page header lists every active alert across the fleet,
+critical first (red, ⛔) then warnings (amber, ⚠). Each aircraft card repeats
+its own alerts above the video and highlights the affected reading. Labels and
+icons accompany the colors, so state is never shown by color alone.
+
+**Sound alerts** is off when the page opens, because browsers only allow sound
+after a click. Turn it on once per session. A new warning beeps once; a critical
+alert beeps three tones every 10 seconds until **Silence these alerts** is
+pressed. Silencing lasts until that alert clears; a new message or an escalation
+to critical sounds again.
+
+Alerts keep updating when the dashboard is a background tab: status checks are
+paced by a small worker script (`dist/ticker.js`), whose timers browsers do not
+slow down the way they slow a hidden page's own timers. The tab title also
+starts with ⛔ CRITICAL or ⚠ WARNING while an alert is active. A minimized
+window or a sleeping laptop still stops everything, so keep the dashboard open
+and the laptop awake during flights.
+
+Alert rules (all computed on the laptop from passive telemetry):
+
+| Alert | Level | Rule |
+|---|---|---|
+| Telemetry lost | critical if last seen ARMED, else warning | No FC heartbeat for 5 s |
+| Battery low / critical | warning / critical | Voltage below the limit for 5 s straight (brief throttle sag ignored) |
+| No 3D GPS fix | critical | Only while armed, and only when the aircraft sends GPS messages (quadpi currently does not) |
+| Few satellites | warning | Fewer than 6 while armed |
+| GPS messages stopped | warning | Armed, and GPS messages seen earlier have not arrived for 10 s |
+| RC receiver signal lost | critical if armed | Flight controller reports the RC receiver unhealthy |
+| Sensor unhealthy | warning (attitude estimate: critical if armed) | Flight controller health flags |
+| Airspeed below minimum | warning | Armed, in the air or landing above 5 m (the flare is excluded, and so is takeoff), under the minimum for 5 s |
+| Aircraft messages | ArduPilot error/critical → critical 60 s; warning → warning 30 s | Text the autopilot sends to QGC |
+
+Cruza's limits copy its flight-controller settings in the 2026-10-14 snapshot:
+BATT_LOW_VOLT 14.0 V, BATT_CRT_VOLT 13.2 V and AIRSPEED_MIN 10 m/s. They are
+the `LIMITS` table near the top of `server.py`; change them there if those
+parameters change. quadpi's battery limits are unknown, so its battery and
+airspeed checks are off. The dashboard only warns; the aircraft's own failsafes
+are unchanged and remain the actual protection.
+
+New readings on each card: airspeed, heading, climb rate, throttle, distance and
+direction from home (from HOME_POSITION, or the first armed GPS position when
+home has not been seen), landed state, pre-arm status and sensor health. Two
+five-minute graphs show altitude and airspeed; hover a graph for a value. A
+**Messages** list keeps the last 30 events: arm/disarm, mode changes, telemetry
+loss/restoration and the autopilot's text messages, with repeats collapsed
+(×N). The map shows a heading arrow on live aircraft, and its popup adds
+airspeed and distance from home. History is in memory only and clears when the
+dashboard or the Pi observer restarts.
+
+When an aircraft's link drops, its card keeps the last values received (mode,
+arming, battery, altitude, speeds, heading, climb, throttle) in dimmed italics
+under a note saying how long ago they arrived, instead of blanking them. These
+are display only: alerts and the live map never use them.
+
+### Pi observer update required for autopilot messages
+
+The autopilot's text messages (STATUSTEXT) and home position (HOME_POSITION)
+only reach the laptop after the updated `companion/telemetry-tap.py` is
+installed on each Pi. Until then everything else above works, but the
+Messages list shows only laptop-detected events and distance uses the launch
+point. The updated observer forwards those two extra message types, passes
+every text message rather than thinning them to one per half second, and caps
+text at 20 messages per 10 s. It still only watches outgoing packets and cannot
+send anything. Install it with the existing guarded installer, which backs up
+the current files and restarts only the optional observer service:
+
+```sh
+sudo ./install-telemetry-observer.sh cruza    # on Cruza, from a copy of companion/
+sudo ./install-telemetry-observer.sh quadpi   # on quadpi
+```
+
+Validation: 26 fleet decoder/session tests pass, including text messages and
+chunk joining, repeat collapsing, arm/mode events, lost-link escalation, the
+5-second battery rule (and that a brief sag does not alert), RC loss, distance
+from home, graph history, no GPS alert for an aircraft that sends no GPS,
+low airspeed on the landing approach but not in the flare, and last-known
+values after a link loss. A local, explicitly SIMULATED harness (not in the
+repository) served the real page with a circling Cruza and an armed quadpi that
+lost its link; desktop and phone-width screenshots, graph hover, sound toggle
+and silencing were checked with no page errors. Not yet checked against live
+aircraft.
+
+## Offline aerial imagery of the flying field (19 October 2026)
+
+The map can show aerial photos of the area around the flying field, with no
+internet needed during flights and nothing to load per mission. Download them
+**once** while the laptop has internet: double-click
+`Download field imagery.cmd` in this folder (or run
+`python dashboard/download-imagery.py`). It takes a few minutes, saves about
+3,200 tiles (roughly 80 MB) under the ignored `runtime/imagery/` folder and can
+be re-run safely; it skips tiles already saved, so an interrupted download just
+continues.
+The service's ready-made tiles stop at zoom 16 (about 2 m per pixel); for the
+two sharpest levels the script asks the same service to render each tile from
+the full-resolution photos instead, so those take a little longer.
+
+Coverage is centered on the calibration mission's planned home
+(33.72322, -85.90669): full detail (the finest the service offers, roughly 0.5–1 m per pixel) within 2.5 km,
+medium detail within 6 km and coarse context within 15 km. For a different
+field, pass `--lat`, `--lon` and optionally `--radius-km`.
+
+Once downloaded, the dashboard opens on the field instead of the U.S. overview,
+**Flying field** returns there, and **Aerial imagery (offline)** under the map
+hides or shows the photos. County, road and aircraft layers draw on top. The
+photos sit above the optional street map, so untick imagery to see streets.
+The imagery is served by the laptop dashboard itself; the page makes no
+external request for it.
+
+Source: USGS The National Map, USGSImageryOnly service (U.S. Government public
+domain orthoimagery, mainly USDA NAIP aerial photography). Photos can be a
+year or more old. Verification used locally generated, labelled SIMULATED tiles
+because the real service was not reachable from the development environment;
+the real download has not yet been run.
+
+### Partner aircraft naming (20 October 2026)
+
+The dashboard now identifies the third aircraft as **TFW drone**, a 10-inch quad
+using its Pi and a wearable mesh radio. It no longer describes a Mini. quadpi's
+subtitle also uses the generic wearable-radio topology. The existing internal
+source ID `rn03` is retained for compatibility. TFW drone telemetry now reads
+the existing MAVLink TCP server at `100.100.0.6:5760` over the VPN without
+transmitting MAVLink requests or commands. Its frames use the same CRC and
+FC identity checks as the other aircraft; matching system IDs do not combine
+the separate sources. Its video remains explicitly unconfigured.
+
+### Fleet layout and partner telemetry (21 October 2026)
+
+The full-width map is the primary panel, above three equal-width aircraft
+cards. The map uses roughly half the viewport height with responsive minimum
+heights. All cards share a header, 16:9 video area, expand action, aircraft
+status, charts, mission information and messages. TFW drone displays a video
+placeholder until an independent copy is configured. Narrow phones stack cards.
+
+The partner TCP reader stops when no viewer is present and sends no application
+bytes to the aircraft. SSH observer sources also accept a per-source username
+for future companions. The incoming partner UDP video receiver was not enabled:
+its shared pilot video port could divert packets from QGC. Existing aircraft
+video destinations and flight services remain unchanged.
+
+Validation: 29 Python decoder/session/TCP-reader checks and the map checks
+passed. Browser checks verified equal card widths, aligned camera areas and the
+larger full-width map. TFW drone's heartbeat, position, battery and mission
+status were verified live; this does not establish flight readiness.
