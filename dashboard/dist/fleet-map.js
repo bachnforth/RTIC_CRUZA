@@ -1,6 +1,6 @@
 'use strict';
 (function(){
-const titles={cruza:'Cruza',quadpi:'quadpi',rn03:'RN03 aircraft'},colors={cruza:'#7ce1ba',quadpi:'#7dbcf4',rn03:'#d3a9ed'};
+const titles={cruza:'Cruza',quadpi:'quadpi',rn03:'RN03'},colors={cruza:'#7ce1ba',quadpi:'#7dbcf4',rn03:'#d3a9ed'};
 const map=L.map('map',{minZoom:1,maxZoom:19,worldCopyJump:true,scrollWheelZoom:false}).setView([39,-98],3);
 map.createPane('basemap').style.zIndex=240;
 map.createPane('stateBorders').style.zIndex=300;

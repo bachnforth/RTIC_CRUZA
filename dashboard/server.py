@@ -18,6 +18,11 @@ from fleet import VehicleState
 
 HERE = Path(__file__).resolve().parent
 KEY = Path.home()/'.ssh'/'id_ed25519_rpi'
+# RN03 needs no tap: mavlink-router already serves every GCS on TCP 5760 and
+# fpv-relay already pushes RTP at the roster-3 laptop address on the mesh.
+RN03_PI = '10.223.53.30'
+RN03_TELEMETRY_PORT = 5760
+RN03_VIDEO_BIND = ('10.223.53.10', 5600)
 STOP = threading.Event()
 last_viewer = 0
 last_telemetry_viewer = 0
@@ -115,6 +120,159 @@ class Feed:
                         self.proc.stderr.close()
                         self.proc = None
                 STOP.wait(3)
+
+
+class UdpFeed:
+    """RN03 sends RTP to the laptop's mesh address already, so no tap, SSH or
+    aircraft change is needed. The socket is bound only while a viewer watches,
+    and only on the mesh address, so pausing hands the port back to QGC."""
+    def __init__(self, name, bind, local_port):
+        self.name, self.bind, self.local_port = name, bind, local_port
+        self.sock = None
+        self.lock = threading.Lock()
+        self.total = self.packets = self.last_packet = 0
+        self.error = ''
+        self.thread = threading.Thread(target=self.run, daemon=True)
+
+    def disconnect(self):
+        with self.lock:
+            if self.sock:
+                self.sock.close()
+                self.sock = None
+
+    def snapshot(self):
+        age = time.monotonic()-self.last_packet if self.last_packet else None
+        return dict(name=self.name, receiving=age is not None and age < 3,
+                    age_seconds=round(age, 1) if age is not None else None,
+                    bytes=self.total, packets=self.packets, error=self.error)
+
+    def listen(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.settimeout(1)
+            sock.bind(self.bind)
+        except OSError as exc:
+            sock.close()
+            # The pilot's own QGC video link binds the same port; say so plainly.
+            self.error = f'Cannot receive on {self.bind[0]}:{self.bind[1]} ({exc.strerror or exc}). Stop the QGC video source on this port, or pause video here.'
+            return None
+        self.error = ''
+        return sock
+
+    def run(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as output:
+            while not STOP.is_set():
+                if not active():
+                    self.disconnect()
+                    STOP.wait(.5)
+                    continue
+                with self.lock:
+                    if self.sock is None:
+                        self.sock = self.listen()
+                    sock = self.sock
+                if sock is None:
+                    STOP.wait(3)
+                    continue
+                try:
+                    raw = sock.recv(65535)
+                except socket.timeout:
+                    continue
+                except OSError as exc:
+                    self.error = str(exc)
+                    self.disconnect()
+                    STOP.wait(3)
+                    continue
+                output.sendto(raw, ('127.0.0.1', self.local_port))
+                with self.lock:
+                    self.total += len(raw)
+                    self.packets += 1
+                    self.last_packet = time.monotonic()
+
+
+def split_frames(buffer):
+    """Split a MAVLink byte stream into whole frames; return the unread tail."""
+    frames, pos = [], 0
+    while pos < len(buffer):
+        stx = buffer[pos]
+        if stx == 0xFD:
+            if len(buffer)-pos < 12:
+                break
+            size = 12+buffer[pos+1]+(13 if buffer[pos+2] & 1 else 0)
+        elif stx == 0xFE:
+            if len(buffer)-pos < 8:
+                break
+            size = 8+buffer[pos+1]
+        else:
+            pos += 1
+            continue
+        if len(buffer)-pos < size:
+            break
+        frames.append(bytes(buffer[pos:pos+size]))
+        pos += size
+    return frames, buffer[pos:]
+
+
+class DirectTelemetry:
+    """Reads RN03's existing mavlink-router TCP server. It never writes to the
+    socket, so the flight controller gains no GCS and no stream is requested."""
+    def __init__(self, name, host, port):
+        self.name, self.host, self.port = name, host, port
+        self.state = VehicleState(name)
+        self.sock = None
+        self.lock = threading.Lock()
+        self.error = ''
+        self.last_observer = 0
+        self.thread = threading.Thread(target=self.run, daemon=True)
+
+    def disconnect(self):
+        with self.lock:
+            if self.sock:
+                self.sock.close()
+                self.sock = None
+
+    def snapshot(self):
+        data = self.state.snapshot()
+        data['observer_connected'] = time.monotonic()-self.last_observer < 12
+        data['error'] = self.error
+        return data
+
+    def run(self):
+        while not STOP.is_set():
+            if not telemetry_active():
+                self.disconnect()
+                STOP.wait(.5)
+                continue
+            buffer = bytearray()
+            try:
+                sock = socket.create_connection((self.host, self.port), timeout=6)
+                sock.settimeout(1)
+                with self.lock:
+                    self.sock = sock
+                # A fresh token per connection drops values from the old session.
+                self.state.reset_boot(f'tcp:{self.host}:{time.time():.0f}')
+                self.error = ''
+                while not STOP.is_set() and telemetry_active():
+                    try:
+                        raw = sock.recv(4096)
+                    except socket.timeout:
+                        continue
+                    if not raw:
+                        raise EOFError('Telemetry connection closed')
+                    buffer += raw
+                    if len(buffer) > 8192:
+                        del buffer[:-2048]
+                    frames, buffer = split_frames(buffer)
+                    buffer = bytearray(buffer)
+                    for frame in frames:
+                        self.state.consume(frame)
+                    if frames:
+                        self.last_observer = time.monotonic()
+            except (EOFError, OSError, ValueError) as exc:
+                self.error = getattr(exc, 'strerror', None) or str(exc)
+            finally:
+                self.disconnect()
+            STOP.wait(3)
 
 
 class Telemetry:
@@ -255,9 +413,7 @@ class Handler(BaseHTTPRequestHandler):
                 last_telemetry_viewer = time.monotonic()
             raw = json.dumps(dict(active=active(), media_running=media.poll() is None,
                                   feeds=[feed.snapshot() for feed in feeds],
-                                  fleet=[source.snapshot() for source in telemetry]+
-                                  [dict(name='rn03',configured=False,online=False,
-                                        error='Mini telemetry/video source not configured')]),
+                                  fleet=[source.snapshot() for source in telemetry]),
                                   allow_nan=False).encode()
             content_type = 'application/json'
         elif path in ('/', '/index.html','/fleet.js','/fleet.css','/fleet-map.js',
@@ -311,11 +467,13 @@ def main():
     log_thread.start()
     (HERE/'runtime'/'dashboard.pid').write_text(str(os.getpid()))
     feeds = [Feed('cruza', '100.100.0.58', '10.229.125.15', 15600, 18000),
-             Feed('quadpi', '10.223.79.20', '10.223.79.20', 15601, 18002)]
+             Feed('quadpi', '10.223.79.20', '10.223.79.20', 15601, 18002),
+             UdpFeed('rn03', RN03_VIDEO_BIND, 18004)]
     for feed in feeds:
         feed.thread.start()
     telemetry = [Telemetry('cruza','100.100.0.58','10.229.125.15',15610),
-                 Telemetry('quadpi','10.223.79.20','10.223.79.20',15611)]
+                 Telemetry('quadpi','10.223.79.20','10.223.79.20',15611),
+                 DirectTelemetry('rn03', RN03_PI, RN03_TELEMETRY_PORT)]
     for source in telemetry:
         source.thread.start()
     threading.Thread(target=supervisor, daemon=True).start()
