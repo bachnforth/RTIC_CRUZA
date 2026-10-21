@@ -1,5 +1,24 @@
 # Cruza / RTIC fleet dashboard
 
+## Command workflow preview (21 October 2026)
+
+The map includes a **PREVIEW ONLY** panel: choose a platform, an illustrative
+action, a map point when relevant, and an explicit altitude for destination
+previews, then review and complete the preview locally. A point may also be
+picked first and retained as a candidate. Escape cancels picking; Clear point
+removes the candidate. Changing a selection invalidates the previous review.
+Selecting a platform highlights its card and, when available, its map marker.
+
+RTL uses the configured return location in the preview description, never the
+candidate point. Arm/disarm labels refer to flight motors and ignore the point.
+Fixed-wing landing is omitted; TFW drone is unavailable until configured.
+Menus illustrate interaction only, not verified aircraft capabilities. Preview
+completion never claims a command was accepted or an aircraft changed state.
+
+There is **no command API, MAVLink sender, transport, queue or saved command**.
+Nothing in this preview transmits a flight command or changes the Pi bridge.
+Selections are discarded on reload. Video and passive telemetry are unchanged.
+
 ## Current mesh radio assignment — 2026-10-19
 
 **RN20 is the GCS USB radio, RN08 is assigned to quadpi, and RN03 will

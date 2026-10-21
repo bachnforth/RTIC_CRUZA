@@ -64,5 +64,22 @@ function update(fleet){latest=fleet;const legend=document.querySelector('#map-le
   streets=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>',keepBuffer:1});
   streets.on('tileerror',()=>{note.textContent='Street tiles unavailable. Switch off street maps for the offline overview; aircraft markers remain available.';});streets.addTo(map);if(countries)map.removeLayer(countries);b.textContent='Use offline overview';b.setAttribute('aria-pressed','true');note.textContent='Online street map · Visible map areas are requested from OpenStreetMap. Aircraft telemetry stays on this laptop.';
  };
- window.fleetMap={update};
+// Candidate destinations belong only to the local workflow preview.
+let picking=false,candidateMarker=null,selectedPlatform='';
+function cancelPick(){picking=false;document.querySelector('#map').classList.remove('pick-point');}
+function clearCandidate(){cancelPick();if(candidateMarker){map.removeLayer(candidateMarker);candidateMarker=null;}}
+function startPick(){picking=true;follow.checked=false;overviewMode=false;document.querySelector('#map').classList.add('pick-point');document.querySelector('#map').focus();}
+map.on('click',event=>{
+ if(!picking)return;
+ cancelPick();
+ const p=event.latlng.wrap();
+ if(p.lat < -90 || p.lat > 90)return;
+ const loc=[p.lat,p.lng];
+ if(!candidateMarker){candidateMarker=L.marker(loc,{keyboard:false,interactive:false,icon:L.divIcon({className:'candidate-pin',html:'<span>+</span>',iconSize:[30,30],iconAnchor:[15,15]})}).addTo(map);candidateMarker.bindTooltip('Candidate destination · preview only',{permanent:true,direction:'bottom'});}else candidateMarker.setLatLng(loc);
+ document.dispatchEvent(new CustomEvent('fleet-candidate',{detail:{latitude:p.lat,longitude:p.lng}}));
+});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&picking){cancelPick();document.dispatchEvent(new Event('fleet-pick-cancelled'));}});
+function highlightPlatform(){for(const [id,group] of Object.entries(layers)){if(group.marker)group.marker.setRadius(id===selectedPlatform?13:9);}}
+document.addEventListener('fleet-preview-platform',event=>{selectedPlatform=event.detail;highlightPlatform();});
+window.fleetMap={update:fleet=>{update(fleet);highlightPlatform();},startPick,clearCandidate,cancelPick};
 })();
