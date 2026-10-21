@@ -1,6 +1,7 @@
 [Unit]
-Description=Cruza manually requested H264 RTP video
+Description=Cruza H264 RTP video
 After=network-online.target tailscaled.service
+Wants=network-online.target tailscaled.service
 StartLimitIntervalSec=300
 StartLimitBurst=3
 
@@ -16,4 +17,5 @@ TimeoutStopSec=15
 Nice=10
 NoNewPrivileges=yes
 
-# Deliberately no Install section: video never starts automatically at boot.
+[Install]
+WantedBy=multi-user.target

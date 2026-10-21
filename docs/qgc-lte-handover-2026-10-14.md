@@ -1,5 +1,10 @@
 # Cruza QGC over LTE: handover — 2026-10-14
 
+**Superseded by [mission/HAT-health handover](mission-hat-handover-2026-10-14.md).**
+Router/firewall activation and Android QGC parameter download have since
+completed; see [continuation evidence](qgc-lte-testing-2026-10-14.md).
+The states below describe the earlier handover, not the latest live state.
+
 ## Next objective
 
 Continue bench integration of Android QGroundControl with the TBS Lucid Wing

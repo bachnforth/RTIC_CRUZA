@@ -40,8 +40,11 @@ def config(path):
     for key in ("mavlink_port", "video_port"):
         if not isinstance(c[key], int) or not 1024 <= c[key] <= 65535:
             raise ValueError("Invalid UDP port")
-    if not 1 <= c["video_max_seconds"] <= 7200:
-        raise ValueError("Video session limit must be 1..7200 seconds")
+    if type(c["video_max_seconds"]) is not int or not 0 <= c["video_max_seconds"] <= 7200:
+        raise ValueError("Video session limit must be 0 (until stopped) or 1..7200 seconds")
+    mirror = c.get("video_mirror_port", 0)
+    if type(mirror) is not int or (mirror != 0 and not 15600 <= mirror <= 15609):
+        raise ValueError("Video mirror must be disabled (0) or a loopback port 15600..15609")
     if c["android_ip"]:
         tail_ip(c["android_ip"])
     if not re.fullmatch(r"[\w.-]+", c["lte_connection"]):
@@ -87,6 +90,10 @@ def video(c):
                 "pt=96", "config-interval=1", "mtu=1200", "!", "udpsink",
                 f"host={dest}", f"port={c['video_port']}", "sync=false", "async=false",
                 "qos-dscp=8"]
+    if c.get("video_mirror_port", 0):
+        pipeline = pipeline[:pipeline.index("udpsink")] + ["multiudpsink",
+                    f"clients={dest}:{c['video_port']},127.0.0.1:{c['video_mirror_port']}",
+                    "sync=false", "async=false", "qos-dscp=8"]
     emit("video_start", profile=c["video_profile"], bitrate=bitrate,
          max_seconds=c["video_max_seconds"])
     processes = []
@@ -103,8 +110,8 @@ def video(c):
         stream = subprocess.Popen(pipeline, stdin=camera.stdout)
         processes.append(stream)
         camera.stdout.close()
-        deadline = time.monotonic() + c["video_max_seconds"]
-        while not stopping and time.monotonic() < deadline:
+        deadline = time.monotonic() + c["video_max_seconds"] if c["video_max_seconds"] else None
+        while not stopping and (deadline is None or time.monotonic() < deadline):
             if any(p.poll() is not None for p in processes):
                 failed = True
                 break

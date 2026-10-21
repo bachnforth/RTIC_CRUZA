@@ -63,3 +63,7 @@ and the new MAVLink connection still require bench validation.
 - `params/` parameter files
 - `missions/` QGC .plan files
 - `logs/` flight logs
+
+The local [fleet dashboard](dashboard/README.md) shows Cruza and quadpi live
+video beside an interactive aircraft map and passive telemetry at
+`http://127.0.0.1:8765`, preserving their direct QGroundControl connections.

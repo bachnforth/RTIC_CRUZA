@@ -1,0 +1,21 @@
+{
+  "retrieved_on": "2026-10-16",
+  "provider": "U.S. Census Bureau",
+  "layers": {
+    "counties": {
+      "source": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1/query?where=STATE%3D%2701%27&outFields=NAME,GEOID&outSR=4326&maxAllowableOffset=0.001&geometryPrecision=5&f=geojson",
+      "features": 67,
+      "sha256": "82ae7c57290180033062ed70eef47f2ae79e29c04d4fe5eeb2c4b247c96a7bef"
+    },
+    "places": {
+      "source": "https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_01_place_500k.zip",
+      "features": 594,
+      "sha256": "ce1c6a8172c780582fd57caace00a644c23af5f9e18c0612eeb49fa20ab3563c"
+    },
+    "roads": {
+      "source": "https://www2.census.gov/geo/tiger/TIGER2025/PRISECROADS/tl_2025_01_prisecroads.zip",
+      "features": 373,
+      "sha256": "a658ebd98b0a99dc4a4711658c6db36a6756743cc9b8a4a7e36f86a28c080c03"
+    }
+  }
+}

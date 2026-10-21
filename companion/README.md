@@ -3,11 +3,12 @@
 Software is installed on the Pi. LTE internet, Headscale access through cellular
 NAT and one session-recovery test are verified. Pi UART configuration and
 monitoring are verified after reboot. Bidirectional AIO UART is verified after
-the ground connection was moved to physical pin 6; Android QGC routing/video
-reception remain incomplete.
-Continue from the [QGC/LTE handover](../docs/qgc-lte-handover-2026-10-14.md):
-installation and hardware setup below are already complete on TFWCRUZA;
-router activation and Android acceptance tests are next.
+the ground connection was moved to physical pin 6. Phone-only routing is active;
+Android QGC 5.0.8 connects and the owner confirmed its parameter download completed.
+Android video picture is verified in short bench sessions after an authorized
+QGC preference reset. QGC/video with Pi Wi-Fi disconnected remain unverified.
+Continue from the [mission/HAT-health handover](../docs/mission-hat-handover-2026-10-14.md)
+and [QGC test evidence](../docs/qgc-lte-testing-2026-10-14.md).
 This is not an accepted flight system. See the
 [initial audit](../docs/pi-companion-audit-2026-10-14.md). Commands below run on
 the Pi unless identified as laptop/Android steps. No script issues aircraft
@@ -90,7 +91,8 @@ flowchart LR
 10. Android video source: `UDP h.264`, receiving port 5600 (or UDP URL
     `0.0.0.0:5600` where that app version exposes it). Enable low latency if
     available. Start a session with `sudo systemctl start cruza-video`, stop
-    with `sudo systemctl stop cruza-video`. No video starts on boot. If the
+    with `sudo systemctl stop cruza-video`. Boot startup is opt-in; see
+    [automatic video startup](../docs/video-autostart.md). If the
     installed Android build lacks the source/decoder, record exact version
     and diagnose; desktop documentation alone is not proof of compatibility.
 
@@ -108,10 +110,11 @@ Estimated encoded payload: 135 MB/hour at 300 kbps, 180 MB/hour at 400 kbps,
 225 MB/hour at 500 kbps (decimal MB). Add RTP/IP/VPN and telemetry overhead.
 24 GB/year allows about 178/133/107 hours of video payload respectively if
 the entire allowance were devoted to video. Real usable time is lower.
-Example-config sessions stop after 1800 seconds; the live Pi currently uses a
-120-second bench-test limit. Failure retries are bounded by
-systemd (three starts per five minutes). Sessions require manual start; there
-is no viewer detector or automatic bitrate adaptation. A restarted failed
+Example-config sessions stop after 1800 seconds. Setting `video_max_seconds`
+to `0` streams until stopped; the opt-in boot-start installer selects this setting.
+Failure retries are bounded by
+systemd (three starts per five minutes). Sessions require manual start unless
+boot startup is enabled; there is no viewer detector or automatic bitrate adaptation. A restarted failed
 session starts a new duration window. QGC closing alone does not stop video;
 explicitly stop it. Automatic viewer-based control can follow validation.
 
@@ -161,8 +164,8 @@ props removed and a separate test session are required for those tests.
 
 | Operation | Prerequisites / expected evidence | Current status |
 |---|---|---|
-| Heartbeat, GPS/map, battery/mode | AIO MAVLink and router active; QGC inspector and vehicle display | UART telemetry verified; Android router activation pending |
-| Parameter read | Matching system ID, completed download; no writes | UART read reply verified; Android full download pending |
+| Heartbeat, GPS/map, battery/mode | AIO MAVLink and router active; QGC inspector and vehicle display | Router active; FC1/1 telemetry reaches Android; display fields still need recorded checks |
+| Parameter read | Matching system ID, completed download; no writes | UART reply verified; owner confirmed Android download completion; saved export/comparison pending |
 | Mission download | QGC request/list/items/ack, match saved mission | Not verified |
 | Mission upload | Owner selects reviewed plan, mission ACK accepted, download comparison | Not verified |
 | Arm/disarm | Owner-approved props-off bench; normal pre-arm validation and COMMAND_ACK | Not verified |
@@ -178,9 +181,9 @@ Acceptance status:
 | Pi SSH, OS, camera detection | Verified live SSH audit and after reboot |
 | Camera H264 capture | Verified five-second file, not live Android stream |
 | LTE internet on Pi | Verified: QMI session, LTE-bound ping/DNS/HTTPS passed |
-| VPN through cellular NAT / Android endpoints | Verified reachability: private SSH and phone probe with Pi Wi-Fi disconnected; QGC endpoints still need app validation |
-| Heartbeats, GPS, bidirectional commands, missions | Partially verified: valid UART telemetry and read-only parameter reply; Android routing and mission/action commands pending |
-| Video inside Android QGC | Not verified |
+| VPN through cellular NAT / Android endpoints | Phone QGC connection/download confirmed with Pi Wi-Fi available; earlier LTE-only SSH/phone probes passed; LTE-only QGC acceptance pending |
+| Heartbeats, GPS, bidirectional commands, missions | FC1/1 telemetry routed to Android; UART return traffic observed; owner confirmed parameter download; mission/action tests pending |
+| Video inside Android QGC | Actual picture observed after QGC preference reset and after app restart; short bench session with Pi Wi-Fi available, LTE-only pending |
 | Combined CPU/RAM/power load | Not verified; short camera test has no throttling flag |
 | Configurable video bitrate | Partially verified: files/config and rpicam test; profiles not streamed |
 | Boot startup / individual recovery / LTE outage | Partially verified: network/monitoring services restart; NM recovered one bearer disconnect; LTE cold boot, prolonged outages and router/video recovery remain pending |
