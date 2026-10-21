@@ -277,8 +277,11 @@ class DirectTelemetry:
 
 class Telemetry:
     """Receives bounded JSON via SSH; cannot write bytes to an aircraft socket."""
-    def __init__(self, name, host, alias, port):
+    def __init__(self, name, host, alias, port, user='ebach'):
         self.name, self.host, self.alias, self.port = name, host, alias, port
+        # Companion Pis are not all owned by the same person. RN03's Pi has no
+        # ebach account, so the login name travels with the source.
+        self.user = user
         self.state = VehicleState(name)
         self.proc = None
         self.lock = threading.Lock()
@@ -306,7 +309,7 @@ class Telemetry:
             argv = ['ssh','-T','-i',str(KEY),'-o','IdentitiesOnly=yes','-o','BatchMode=yes',
                     '-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=6',
                     '-o','ServerAliveInterval=5','-o','ServerAliveCountMax=2',
-                    '-o','LogLevel=ERROR','-o','HostKeyAlias='+self.alias,'ebach@'+self.host,
+                    '-o','LogLevel=ERROR','-o','HostKeyAlias='+self.alias,self.user+'@'+self.host,
                     'python3 -c '+shlex.quote((HERE.parent/'companion'/'telemetry-session.py').read_text(encoding='utf-8-sig'))+' '+str(self.port)]
             reader = lease_thread = None
             lease_stop = threading.Event()
@@ -473,6 +476,12 @@ def main():
         feed.thread.start()
     telemetry = [Telemetry('cruza','100.100.0.58','10.229.125.15',15610),
                  Telemetry('quadpi','10.223.79.20','10.223.79.20',15611),
+                 # RN03 reads mavlink-router's TCP server directly: no SSH, no key on
+                 # the aircraft, nothing installed. The passive observer is now also
+                 # running on that Pi, so the SSH path is available as an alternative:
+                 #     Telemetry('rn03', RN03_PI, RN03_PI, 15611, user='jbrascom')
+                 # It needs the dashboard key in jbrascom's authorized_keys and the
+                 # host key under HostKeyAlias. Pick one; running both is pointless.
                  DirectTelemetry('rn03', RN03_PI, RN03_TELEMETRY_PORT)]
     for source in telemetry:
         source.thread.start()
