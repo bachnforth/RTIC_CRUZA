@@ -333,6 +333,7 @@ async function tick() {
     status.fleet.forEach(renderVehicle);
     renderBanner(status.fleet);
     drawMap(status.fleet);
+    document.dispatchEvent(new CustomEvent('fleet-status', {detail: status}));
     for (const f of status.feeds) {
       const prev = previous[f.name];
       const rate = prev ? Math.round(Math.max(0, f.bytes - prev.bytes) * 8 / (now - prev.time)) : 0;

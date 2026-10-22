@@ -87,7 +87,7 @@ map.on('click',event=>{
  const p=event.latlng.wrap();
  if(p.lat < -90 || p.lat > 90)return;
  const loc=[p.lat,p.lng];
- if(!candidateMarker){candidateMarker=L.marker(loc,{keyboard:false,interactive:false,icon:L.divIcon({className:'candidate-pin',html:'<span>+</span>',iconSize:[30,30],iconAnchor:[15,15]})}).addTo(map);candidateMarker.bindTooltip('Candidate destination · preview only',{permanent:true,direction:'bottom'});}else candidateMarker.setLatLng(loc);
+ if(!candidateMarker){candidateMarker=L.marker(loc,{keyboard:false,interactive:false,icon:L.divIcon({className:'candidate-pin',html:'<span>+</span>',iconSize:[30,30],iconAnchor:[15,15]})}).addTo(map);candidateMarker.bindTooltip('Selected point',{permanent:true,direction:'bottom'});}else candidateMarker.setLatLng(loc);
  document.dispatchEvent(new CustomEvent('fleet-candidate',{detail:{latitude:p.lat,longitude:p.lng}}));
 });
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&picking){cancelPick();document.dispatchEvent(new Event('fleet-pick-cancelled'));}});

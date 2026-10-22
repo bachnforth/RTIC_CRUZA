@@ -16,6 +16,7 @@ import subprocess
 import threading
 import time
 from fleet import Limits, VehicleState
+from control import QuadControl, parse_target
 
 # Alert thresholds. Cruza's values copy its own flight-controller settings
 # (BATT_LOW_VOLT 14.0, BATT_CRT_VOLT 13.2, AIRSPEED_MIN 10 in the 2026-10-14
@@ -34,6 +35,8 @@ last_telemetry_viewer = 0
 feeds = []
 telemetry = []
 media = None
+controls = {}   # platform name -> live control link (only quadpi so far)
+ORIGINS = ('http://127.0.0.1:8765', 'http://localhost:8765')
 
 
 def active():
@@ -319,10 +322,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global last_viewer
-        if (self.path not in ('/pause', '/shutdown') or self.headers.get('Host') not in ('127.0.0.1:8765', 'localhost:8765')
-            or self.headers.get('Origin') not in ('http://127.0.0.1:8765', 'http://localhost:8765')
+        if (self.path not in ('/pause', '/shutdown', '/control') or self.headers.get('Host') not in ('127.0.0.1:8765', 'localhost:8765')
+            or self.headers.get('Origin') not in ORIGINS
             or self.headers.get('Sec-Fetch-Site', 'same-origin') != 'same-origin'):
             self.send_error(403)
+            return
+        if self.path == '/control':
+            self.handle_control()
             return
         last_viewer = 0
         for feed in feeds:
@@ -332,6 +338,29 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=self.server.shutdown, daemon=True).start()
         self.send_response(204)
         self.end_headers()
+
+    def handle_control(self):
+        # JSON-only body from this page; the bridge re-checks every command shape.
+        length = int(self.headers.get('Content-Length') or 0)
+        if not controls or self.headers.get('Content-Type') != 'application/json' or not 0 < length <= 1024:
+            self.send_error(403 if not controls else 400)
+            return
+        try:
+            body = json.loads(self.rfile.read(length))
+        except ValueError:
+            self.send_error(400)
+            return
+        link = controls.get(body.get('platform')) if isinstance(body, dict) else None
+        if link is None:
+            self.send_error(403)   # preview-only platforms have no command path
+            return
+        raw = json.dumps(link.execute(body), allow_nan=False).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(raw)))
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(raw)
 
     def do_GET(self):
         global last_viewer, last_telemetry_viewer
@@ -352,13 +381,14 @@ class Handler(BaseHTTPRequestHandler):
                 last_telemetry_viewer = time.monotonic()
             raw = json.dumps(dict(active=active(), media_running=media.poll() is None,
                                   feeds=[feed.snapshot() for feed in feeds],
-                                  fleet=[source.snapshot() for source in telemetry]),
+                                  fleet=[source.snapshot() for source in telemetry],
+                                  controls={name: link.status() for name, link in controls.items()}),
                                   allow_nan=False).encode()
             content_type = 'application/json'
         elif path in ('/', '/index.html','/fleet.js','/ticker.js','/fleet.css','/fleet-map.js',
                       '/leaflet.js','/leaflet.css','/world.geojson','/us-states.geojson','/map-state.js',
                       '/alabama-map.js','/al-counties.geojson','/al-places.geojson','/al-roads.geojson',
-                      '/command-preview.js'):
+                      '/command-workflow.js'):
             name = 'index.html' if path == '/' else path.lstrip('/')
             raw = (HERE/'dist'/name).read_bytes()
             content_type = {'js':'application/javascript','css':'text/css',
@@ -422,11 +452,20 @@ def main():
              Feed('quadpi', '10.223.79.20', '10.223.79.20', 15601, 18002)]
     for feed in feeds:
         feed.thread.start()
+    # Optional click-to-fly link; when enabled it also supplies quadpi telemetry.
+    control = None
+    if os.environ.get('DASHBOARD_QUAD_CONTROL'):
+        control = controls['quadpi'] = QuadControl(parse_target(os.environ['DASHBOARD_QUAD_CONTROL']),
+                              HERE/'runtime'/'quad-commands.log', telemetry_active,
+                              LIMITS['quadpi'], STOP)
     telemetry = [Telemetry('cruza','100.100.0.58','10.229.125.15',15610),
-                 Telemetry('quadpi','10.223.79.20','10.223.79.20',15611),
+                 control or Telemetry('quadpi','10.223.79.20','10.223.79.20',15611),
                  DirectTelemetry('rn03','100.100.0.6',5760)]
     for source in telemetry:
-        source.thread.start()
+        if source is control:
+            control.start()
+        else:
+            source.thread.start()
     threading.Thread(target=supervisor, daemon=True).start()
     def stop(*_):
         STOP.set()

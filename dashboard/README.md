@@ -1,23 +1,33 @@
 # Cruza / RTIC fleet dashboard
 
-## Command workflow preview (21 October 2026)
+## Command workflow (21 October 2026)
 
-The map includes a **PREVIEW ONLY** panel: choose a platform, an illustrative
-action, a map point when relevant, and an explicit altitude for destination
-previews, then review and complete the preview locally. A point may also be
-picked first and retained as a candidate. Escape cancels picking; Clear point
-removes the candidate. Changing a selection invalidates the previous review.
-Selecting a platform highlights its card and, when available, its map marker.
+Below the map, one **Command workflow** serves every aircraft: 1 · choose a
+platform, 2 · a command, 3 · a map point and/or altitude when the command needs
+them, 4 · review, then send. Each platform is labelled **LIVE** or
+**preview only** in the menu.
 
-RTL uses the configured return location in the preview description, never the
-candidate point. Arm/disarm labels refer to flight motors and ignore the point.
-Fixed-wing landing is omitted; TFW drone is unavailable until configured.
-Menus illustrate interaction only, not verified aircraft capabilities. Preview
-completion never claims a command was accepted or an aircraft changed state.
+- **LIVE** (today only quadpi, and only when started with `-QuadControl`): the
+  review button reads *Send to quadpi*, the review expires after 20 s, and the
+  aircraft's acknowledgement or refusal reason appears below. Hold (BRAKE),
+  RTL and Land are also in an **Immediate** row next to the aircraft's status
+  line; they send on one click without review. That row sits away from the
+  Send button on purpose: during SITL testing a page shift turned a click aimed
+  at Send into Hold when the two were adjacent.
+- **Preview only** (Cruza and TFW drone): menus illustrate the workflow, a
+  completed preview transmits nothing, and the server refuses any `/control`
+  request for these platforms (HTTP 403).
 
-There is **no command API, MAVLink sender, transport, queue or saved command**.
-Nothing in this preview transmits a flight command or changes the Pi bridge.
-Selections are discarded on reload. Video and passive telemetry are unchanged.
+Changing platform clears the chosen command, so nothing carries over between
+aircraft or from preview to live. Commands the aircraft's current state does
+not allow (for example Disarm in the air) cannot be reviewed and say why. Escape
+cancels point picking; Clear point removes the point. Selecting a platform
+highlights its card and map marker. Fixed-wing landing is left out of Cruza's
+preview menu.
+
+Adding another live platform means a control link for it in `control.py`
+(registered in `server.py`'s `controls`) plus its own reviewed command
+allowlist on that aircraft's companion computer.
 
 Open **http://127.0.0.1:8765** on this laptop. Both camera pictures were verified
 in the browser on 2026-10-15. The viewer is local-only and has no flight controls,
@@ -28,6 +38,72 @@ To reopen after stopping/restarting the laptop, double-click
 It uses the existing bundled Python runtime; pass `-PythonPath` if that runtime
 moves. `stop-dashboard.ps1` stops only the laptop viewer and its extra streams.
 No administrator privileges are needed to launch it.
+
+## quadpi click-to-fly control (21 October 2026) — SITL-tested only
+
+**Not yet installed on quadpi or flown.** Off unless the dashboard is started
+with `-QuadControl host:port`; without it nothing below is active and the page
+stays read-only.
+
+quadpi's live commands in the workflow:
+**Arm & take off** to 1–120 m (switches to GUIDED, arms, takes off),
+**Fly to point & hold** picked on the map at 1–120 m (within 1 km of the quad),
+**Hold** (BRAKE, ignores the Pocket's sticks), **RTL**, **Land here**, and
+**Disarm** on the ground. Each step waits for the
+aircraft's acknowledgement, is never retried, and shows the refusal reason
+(including recent PreArm text). Every action is appended to the ignored
+`runtime/quad-commands.log`. Cruza stays read-only.
+
+`control.py` talks directly to the quadpi bridge's UDP command port
+(`safety_mavlink_filter.py`, sibling 10 inch Quad project) and also supplies the
+quadpi card's telemetry while enabled. While a page is open it sends a 1 Hz GCS
+heartbeat and, if no position arrives, the same stream requests the bridge
+already permits. Closing every page stops the heartbeat; with
+`FS_GCS_ENABLE` set the quad then fails safe unless another GCS (phone QGC) is
+still sending heartbeats.
+
+The bridge passes only these exact shapes to system 1 / component 1: arm or
+disarm with param2 = 0 (never forced), mode GUIDED/LOITER/RTL/LAND/BRAKE, takeoff
+to 1–120 m, and DO_REPOSITION (relative altitude, default speed, change-mode flag,
+no yaw) to 1–120 m. Parameter writes, forced arm/disarm, other modes, RC
+overrides, manual control, servo/actuator commands, flight termination and any
+change to the safety-device command stay blocked. FC traffic is now copied to
+up to four senders heard in the last 5 s, so phone QGC and the dashboard both
+receive acknowledgements. The safety device is not controllable from the dashboard.
+
+### SITL validation (21 October 2026)
+
+Mission Planner's ArduCopter SITL ran behind the real modified bridge
+(`--serial tcp:127.0.0.1:5762 --udp-listen 14551`) and the dashboard was started
+with `-QuadControl 127.0.0.1:14551`. In the browser: arm & take off to 10 m,
+fly to a point 100 m north (arrived within 0.1 m), Hold, RTL (landed at home and
+auto-disarmed), take off to 5 m and Land (landed and disarmed). The dashboard
+refused an in-air disarm; a normal in-air disarm sent straight to the bridge was
+refused by the FC (`FAILED`), and a forced disarm was dropped by the bridge
+(counted as blocked; the aircraft stayed armed). With `FS_GCS_ENABLE=1` on the
+simulator, shutting the dashboard down mid-hover produced RTL 4.3 s later.
+Tests: 19 bridge tests (allow/deny shapes, peers) and 37 dashboard tests,
+including 8 control-link tests against a fake bridge.
+
+The same flights were repeated through the rebuilt Command workflow: takeoff to
+10 m, fly to a point 100 m east at 15 m (arrived within 0.3 m), Hold, RTL to a
+landing and auto-disarm, takeoff to 5 m and Land. A Cruza preview completed
+without transmitting, and `/control` returned 403 for Cruza and for requests
+without a platform. Disarm could not be reviewed while airborne.
+
+On Windows the bridge needs a listener on its `--udp-target`, otherwise
+Windows' UDP reset behaviour applies; a departed peer no longer crashes it.
+
+### Before using it on the real quad (phase 2, props off, then phase 3)
+
+1. Back up the live bridge on quadpi, install the new `safety_mavlink_filter.py`,
+   restart only `safety-mavlink-filter` at the bench and run its tests there.
+2. Back up FC parameters, then set `FS_GCS_ENABLE` (RTL or Land) and confirm a
+   geofence (`FENCE_ENABLE` was 0 in the September snapshots). Keep RC failsafe
+   and the Pocket's flight-mode switch unchanged.
+3. Start with `start-dashboard.ps1 -QuadControl 10.223.79.20:14551`, props off:
+   check every button's acknowledgement and refusal, and both failsafes.
+4. First flight: short hover with a safety pilot on the Pocket.
 
 ## How to use it
 

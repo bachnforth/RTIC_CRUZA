@@ -82,3 +82,13 @@
 .workspace .map-heading h2{font-size:22px;letter-spacing:-.3px}
 .workspace #map{border:1px solid #3b5667}
 @media(max-width:720px){.workspace .map-heading h2{font-size:19px}}
+
+.command-preview.wf-live{border:1px solid #4d7a5c;border-radius:8px;background:#0f2019;padding:14px}
+.workflow-drawer>summary span#wf-badge-text{color:#ffd68a}
+.command-preview.wf-live #wf-mode{color:#ff9a7a}
+#wf-state{margin:0;font-weight:600}#wf-state.wf-armed{color:#ff9a7a}
+.wf-quick{display:grid;gap:8px;border:1px solid #6b5a2e;border-radius:6px;padding:10px;background:#1d1a10}.wf-quick>strong{font-size:12px;color:#ffd68a}
+.wf-quick button:not(:disabled){border-color:#ffd68a;color:#ffd68a;min-width:110px}
+#wf-result{min-height:20px;color:#b5e7d5}#wf-result.failed,.wf-log .failed{color:#ff9a7a}#wf-result.ok,.wf-log .ok{color:#7ce1ba}
+.wf-log{margin:0;padding-left:18px;font-size:12px;display:grid;gap:2px}
+.notice.notice-control{color:#ffd68a}
