@@ -1,5 +1,11 @@
 # Cruza → quad data-link test
 
+Local installation, 22 October 2026: both VPN and mesh targets are enabled in
+`plan.json`. Scripts are installed on tfwcruza and QuadPi only. TFWdrone is
+managed by the partner; its SSH login deliberately remains `CHANGE_ME`.
+See `installation-2026-10-22.md` for verification and outstanding routing work.
+Use `start -Quad quadpi` to limit a session to QuadPi until TFWdrone is ready.
+
 **Question this answers:** while the Cruza is flying, and as it gets farther away,
 can its companion Pi pass data to each quad's Pi, reliably and fast enough?
 
@@ -153,8 +159,8 @@ Only after the steps in `docs/handover-2026-10-20-cruza-lte-flight.md` §5 (on t
 `lte-bvlos-flight-review` branch): the
 Cruza accepts the gateway's route (`tailscale set --accept-routes`), the gateway
 and quad radios are up, and each quad has a route back to `100.64.0.0/10` via the
-gateway. Then set `"enabled": true` on the quad's `mesh` path in `plan.json`, and
-add `"bind": ["<quad mesh IP>", "<quad VPN IP>"]` to that quad so answers leave from
+gateway. This local plan already sets `"enabled": true` on each quad's `mesh` path and
+sets `"bind": ["<quad mesh IP>", "<quad VPN IP>"]` on each quad so answers leave from
 the address they were sent to. Both paths are then tested side by side and appear
 as separate rows (`quadpi/vpn`, `quadpi/mesh`).
 

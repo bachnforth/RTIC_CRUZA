@@ -6,7 +6,9 @@
     "ssh": "ebach@100.100.0.58",
     "tailnet_ip": "100.100.0.58",
     "lte_interface": "wwan0",
-    "extra_allow": []
+    "extra_allow": [],
+    "ssh_host_key_alias": "10.229.125.15",
+    "ssh_key": "id_ed25519_rpi"
   },
   "probe": {
     "rate_hz": 5,
@@ -21,20 +23,44 @@
   "quads": [
     {
       "name": "quadpi",
-      "ssh": "ebach@100.100.0.10",
+      "ssh": "ebach@10.223.79.20",
       "position": null,
       "paths": [
-        {"label": "vpn", "addr": "100.100.0.10"},
-        {"label": "mesh", "addr": "10.223.79.20", "enabled": false}
-      ]
+        {
+          "label": "vpn",
+          "addr": "100.100.0.10"
+        },
+        {
+          "label": "mesh",
+          "addr": "10.223.79.20",
+          "enabled": true
+        }
+      ],
+      "bind": [
+        "100.100.0.10",
+        "10.223.79.20"
+      ],
+      "ssh_host_key_alias": "10.223.79.20",
+      "ssh_key": "id_ed25519_rpi"
     },
     {
       "name": "tfwdrone",
       "ssh": "CHANGE_ME@100.100.0.6",
       "position": null,
       "paths": [
-        {"label": "vpn", "addr": "100.100.0.6"},
-        {"label": "mesh", "addr": "10.223.53.30", "enabled": false}
+        {
+          "label": "vpn",
+          "addr": "100.100.0.6"
+        },
+        {
+          "label": "mesh",
+          "addr": "10.223.53.30",
+          "enabled": true
+        }
+      ],
+      "bind": [
+        "100.100.0.6",
+        "10.223.53.30"
       ]
     }
   ],

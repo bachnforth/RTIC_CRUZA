@@ -1,0 +1,77 @@
+{
+  "_about": "Cruza -> quad link-test plan. Edit addresses, users and criteria here; every script reads this one file.",
+  "port": 15700,
+  "duration_s": 3600,
+  "cruza": {
+    "ssh": "ebach@100.100.0.58",
+    "tailnet_ip": "100.100.0.58",
+    "lte_interface": "wwan0",
+    "extra_allow": [
+      "10.223.58.11/32"
+    ],
+    "ssh_host_key_alias": "10.229.125.15",
+    "ssh_key": "id_ed25519_rpi"
+  },
+  "probe": {
+    "rate_hz": 5,
+    "size_bytes": 300
+  },
+  "burst": {
+    "interval_s": 30,
+    "bytes": 50000,
+    "chunk_bytes": 1000,
+    "max_kbps": 512
+  },
+  "quads": [
+    {
+      "name": "quadpi",
+      "ssh": "ebach@10.223.79.20",
+      "position": null,
+      "paths": [
+        {
+          "label": "mesh-relay",
+          "addr": "100.100.0.23",
+          "port": 15710,
+          "enabled": true
+        }
+      ],
+      "bind": [
+        "100.100.0.10",
+        "10.223.79.20"
+      ],
+      "ssh_host_key_alias": "10.223.79.20",
+      "ssh_key": "id_ed25519_rpi"
+    },
+    {
+      "name": "tfwdrone",
+      "ssh": "CHANGE_ME@100.100.0.6",
+      "position": null,
+      "paths": [
+        {
+          "label": "mesh-relay",
+          "addr": "100.100.0.23",
+          "port": 15711,
+          "enabled": true
+        }
+      ],
+      "bind": [
+        "100.100.0.6",
+        "10.223.53.30"
+      ],
+      "enabled": true
+    }
+  ],
+  "criteria": {
+    "uplink_delivery_pct": 98,
+    "window_s": 10,
+    "window_min_pct": 90,
+    "windows_pass_pct": 95,
+    "rtt_p95_ms": 1000,
+    "max_outage_s": 5,
+    "burst_complete_pct": 90,
+    "burst_min_kbps": 64,
+    "min_probes": 300,
+    "min_distance_m": 1000,
+    "distance_bin_m": 250
+  }
+}

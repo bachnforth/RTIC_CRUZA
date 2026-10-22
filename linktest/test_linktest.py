@@ -46,6 +46,13 @@ class Bitmap(unittest.TestCase):
 
 
 class TailscalePaths(unittest.TestCase):
+    def test_specific_gateway_route_takes_precedence(self):
+        status = {"Peer": {
+            "a": {"HostName": "alien03", "PrimaryRoutes": ["10.223.0.0/16"]},
+            "b": {"HostName": "alien08", "PrimaryRoutes": ["10.223.79.20/32"]}}}
+        result = linktest.tailscale_paths(json.dumps(status), ["10.223.79.20"])
+        self.assertEqual(result["10.223.79.20"]["peer"], "alien08")
+
     def test_direct_relay_and_subnet_router(self):
         status = {"Peer": {
             "a": {"HostName": "quadpi", "TailscaleIPs": ["100.100.0.10"], "CurAddr": "1.2.3.4:41641",
@@ -63,11 +70,11 @@ class TailscalePaths(unittest.TestCase):
 
 
 class PlanChecks(unittest.TestCase):
-    def test_shipped_plan_is_valid_and_mesh_paths_start_disabled(self):
+    def test_shipped_plan_is_valid_and_mesh_paths_are_enabled(self):
         plan = linktest.load_plan(HERE / "plan.json")
         names = [t["name"] for t in linktest.targets_from_plan(plan)]
-        self.assertEqual(names, ["quadpi/vpn", "tfwdrone/vpn"])
-        self.assertEqual([t["name"] for t in linktest.targets_from_plan(plan, ["quadpi"])], ["quadpi/vpn"])
+        self.assertEqual(names, ["quadpi/vpn", "quadpi/mesh", "tfwdrone/vpn", "tfwdrone/mesh"])
+        self.assertEqual([t["name"] for t in linktest.targets_from_plan(plan, ["quadpi"])], ["quadpi/vpn", "quadpi/mesh"])
 
     def test_rejects_unsafe_rates(self):
         plan = json.loads((HERE / "plan.json").read_text())
@@ -150,6 +157,15 @@ class EndToEnd(unittest.TestCase):
 
 
 class Geometry(unittest.TestCase):
+    def test_session_metadata_after_low_disk_note(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "session"
+            folder.mkdir()
+            meta = {"k": "meta", "role": "sender", "run": "test"}
+            (folder / "events-0001.jsonl").write_text(
+                json.dumps({"k": "note", "low_disk": True}) + "\n" + json.dumps(meta) + "\n")
+            self.assertEqual(report.find_sessions(tmp), [(folder, meta)])
+
     def test_metres(self):
         self.assertAlmostEqual(report.metres(33.0, -86.0, 33.01, -86.0), 1111.95, delta=1)
 

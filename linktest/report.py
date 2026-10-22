@@ -73,7 +73,7 @@ def find_sessions(root):
         for rec in read_events(meta_dir):
             if rec.get("k") == "meta":
                 sessions.append((meta_dir, rec))
-            break
+                break
     return sessions
 
 

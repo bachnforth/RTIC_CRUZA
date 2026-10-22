@@ -1,0 +1,21 @@
+{
+  "vpn_bind_ip": "100.100.0.23",
+  "mesh_source_ip": "10.223.58.11",
+  "allowed_sources": [
+    "100.100.0.58"
+  ],
+  "mappings": [
+    {
+      "name": "quadpi-linktest",
+      "listen_port": 15710,
+      "destination_ip": "10.223.79.20",
+      "destination_port": 15700
+    },
+    {
+      "name": "tfwdrone-linktest",
+      "listen_port": 15711,
+      "destination_ip": "10.223.53.30",
+      "destination_port": 15700
+    }
+  ]
+}

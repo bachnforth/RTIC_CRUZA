@@ -156,7 +156,7 @@ def targets_from_plan(plan, only=None):
             if only and name not in only and quad["name"] not in only:
                 continue
             out.append({"name": name, "quad": quad["name"], "path": path["label"],
-                        "addr": path["addr"], "port": int(plan["port"])})
+                        "addr": path["addr"], "port": int(path.get("port", plan["port"]))})
     return out
 
 
@@ -382,16 +382,16 @@ def tailscale_paths(status_json, addresses):
                 found, kind = peer, "peer"
                 break
         if found is None:
+            best_prefix = -1
             for peer in peers:
                 for net in peer.get("PrimaryRoutes") or []:
                     try:
-                        if ip in ipaddress.ip_network(net, strict=False):
+                        network = ipaddress.ip_network(net, strict=False)
+                        if ip in network and network.prefixlen > best_prefix:
                             found, kind = peer, "subnet-router"
-                            break
+                            best_prefix = network.prefixlen
                     except ValueError:
                         continue
-                if found:
-                    break
         if found is None:
             result[addr] = {"peer": None}
             continue
