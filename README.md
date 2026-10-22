@@ -63,6 +63,7 @@ and the new MAVLink connection still require bench validation.
 - `params/` parameter files
 - `missions/` QGC .plan files
 - `logs/` flight logs
+- `linktest/` in-flight Cruza → quad data-link test and report ([how to run it](linktest/README.md))
 
 The local [fleet dashboard](dashboard/README.md) shows Cruza and quadpi live
 video beside an interactive aircraft map and passive telemetry at

@@ -1,0 +1,54 @@
+{
+  "_about": "Cruza -> quad link-test plan. Edit addresses, users and criteria here; every script reads this one file.",
+  "port": 15700,
+  "duration_s": 3600,
+  "cruza": {
+    "ssh": "ebach@100.100.0.58",
+    "tailnet_ip": "100.100.0.58",
+    "lte_interface": "wwan0",
+    "extra_allow": []
+  },
+  "probe": {
+    "rate_hz": 5,
+    "size_bytes": 300
+  },
+  "burst": {
+    "interval_s": 30,
+    "bytes": 50000,
+    "chunk_bytes": 1000,
+    "max_kbps": 512
+  },
+  "quads": [
+    {
+      "name": "quadpi",
+      "ssh": "ebach@100.100.0.10",
+      "position": null,
+      "paths": [
+        {"label": "vpn", "addr": "100.100.0.10"},
+        {"label": "mesh", "addr": "10.223.79.20", "enabled": false}
+      ]
+    },
+    {
+      "name": "tfwdrone",
+      "ssh": "CHANGE_ME@100.100.0.6",
+      "position": null,
+      "paths": [
+        {"label": "vpn", "addr": "100.100.0.6"},
+        {"label": "mesh", "addr": "10.223.53.30", "enabled": false}
+      ]
+    }
+  ],
+  "criteria": {
+    "uplink_delivery_pct": 98,
+    "window_s": 10,
+    "window_min_pct": 90,
+    "windows_pass_pct": 95,
+    "rtt_p95_ms": 1000,
+    "max_outage_s": 5,
+    "burst_complete_pct": 90,
+    "burst_min_kbps": 64,
+    "min_probes": 300,
+    "min_distance_m": 1000,
+    "distance_bin_m": 250
+  }
+}
