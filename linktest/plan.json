@@ -30,7 +30,9 @@
     },
     {
       "name": "tfwdrone",
-      "ssh": "CHANGE_ME@100.100.0.6",
+      "ssh": "tfwdrone",
+      "ssh_mesh": "jbrascom@10.223.53.30",
+      "ssh_opts": ["-o", "HostKeyAlias=tfwdrone", "-i", "~/.ssh/id_ed25519_pi", "-o", "IdentitiesOnly=yes"],
       "position": null,
       "paths": [
         {"label": "vpn", "addr": "100.100.0.6"},
