@@ -1,0 +1,11 @@
+[Unit]
+Description=Restrict Cruza MAVLink to authorized Android VPN peer
+Before=cruza-router.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/nft -f /etc/cruza/firewall.nft
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,8 @@
+{
+  "parameter": "TRIM_THROTTLE",
+  "before": 45.0,
+  "after": 54.0,
+  "acknowledged": true,
+  "independent_readback": true,
+  "takeoff_parameters_changed": false
+}

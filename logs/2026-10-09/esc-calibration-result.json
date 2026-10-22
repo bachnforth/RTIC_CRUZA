@@ -1,0 +1,36 @@
+{
+  "owner_report": "Two distinct Di Di confirmation sounds; calibration accepted by both ESCs appears likely, not independently read from ESC memory",
+  "verified_low_pwm": 1100,
+  "verified_high_pwm": 1900,
+  "battery_monitor_restored_after_reboot": true,
+  "values": {
+    "BATT_MONITOR": 4.0,
+    "BATT_ARM_VOLT": 13.199999809265137,
+    "BATT_FS_LOW_ACT": 1.0,
+    "BATT_FS_CRT_ACT": 1.0,
+    "TRIM_THROTTLE": 54.0,
+    "THR_MAX": 100.0,
+    "TKOFF_THR_MAX": 0.0,
+    "SERVO4_MIN": 1100.0,
+    "SERVO4_MAX": 1900.0
+  },
+  "armed_after_reboot": false,
+  "mode_after_reboot": 0,
+  "snapshot": "params\\cruza_params_2026-10-09_post_esc_calibration.params",
+  "motor_response_test_completed": true,
+  "motor_response_owner_report": "Both motors started and ran smoothly during normal power-up test with props removed",
+  "final_controller_check": {
+    "vehicle": {
+      "armed": false,
+      "mode": 0
+    },
+    "throttle_pwm": 1100,
+    "parameters": {
+      "BATT_MONITOR": 4.0,
+      "BATT_ARM_VOLT": 13.199999809265137,
+      "BATT_FS_LOW_ACT": 1.0,
+      "BATT_FS_CRT_ACT": 1.0,
+      "TRIM_THROTTLE": 54.0
+    }
+  }
+}

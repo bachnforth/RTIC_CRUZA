@@ -1,0 +1,50 @@
+{
+  "status": "restored",
+  "original": {
+    "BATT_ARM_VOLT": {
+      "value": 13.199999809265137,
+      "type": 9
+    },
+    "BATT_FS_LOW_ACT": {
+      "value": 1.0,
+      "type": 2
+    },
+    "BATT_FS_CRT_ACT": {
+      "value": 1.0,
+      "type": 2
+    }
+  },
+  "changed": [
+    {
+      "parameter": "BATT_ARM_VOLT",
+      "verified_value": 0.0,
+      "action": "prepare"
+    },
+    {
+      "parameter": "BATT_FS_LOW_ACT",
+      "verified_value": 0.0,
+      "action": "prepare"
+    },
+    {
+      "parameter": "BATT_FS_CRT_ACT",
+      "verified_value": 0.0,
+      "action": "prepare"
+    },
+    {
+      "parameter": "BATT_ARM_VOLT",
+      "verified_value": 13.199999809265137,
+      "action": "restore"
+    },
+    {
+      "parameter": "BATT_FS_LOW_ACT",
+      "verified_value": 1.0,
+      "action": "restore"
+    },
+    {
+      "parameter": "BATT_FS_CRT_ACT",
+      "verified_value": 1.0,
+      "action": "restore"
+    }
+  ],
+  "scope": "Attended USB-only ESC calibration, both props removed per owner; restore before flight"
+}

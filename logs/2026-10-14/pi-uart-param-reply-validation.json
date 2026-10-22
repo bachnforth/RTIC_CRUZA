@@ -1,0 +1,132 @@
+{
+  "valid_frames": 786,
+  "message_types": {
+    "ATTITUDE": 95,
+    "VFR_HUD": 95,
+    "AOA_SSA": 95,
+    "AHRS": 28,
+    "GLOBAL_POSITION_INT": 28,
+    "SYSTEM_TIME": 28,
+    "WIND": 28,
+    "TERRAIN_REPORT": 28,
+    "EKF_STATUS_REPORT": 28,
+    "VIBRATION": 28,
+    "BATTERY_STATUS": 28,
+    "SYS_STATUS": 19,
+    "POWER_STATUS": 19,
+    "MEMINFO": 19,
+    "NAV_CONTROLLER_OUTPUT": 19,
+    "MISSION_CURRENT": 19,
+    "SERVO_OUTPUT_RAW": 19,
+    "RC_CHANNELS": 19,
+    "RAW_IMU": 19,
+    "SCALED_IMU2": 19,
+    "SCALED_PRESSURE": 19,
+    "GPS_RAW_INT": 19,
+    "POSITION_TARGET_GLOBAL_INT": 19,
+    "MCU_STATUS": 19,
+    "AIRSPEED": 19,
+    "HEARTBEAT": 9,
+    "PARAM_VALUE": 1,
+    "TIMESYNC": 1
+  },
+  "sources": [
+    [
+      1,
+      1
+    ]
+  ],
+  "heartbeats": [
+    {
+      "mavpackettype": "HEARTBEAT",
+      "type": 1,
+      "autopilot": 3,
+      "base_mode": 89,
+      "custom_mode": 10,
+      "system_status": 3,
+      "mavlink_version": 3
+    },
+    {
+      "mavpackettype": "HEARTBEAT",
+      "type": 1,
+      "autopilot": 3,
+      "base_mode": 89,
+      "custom_mode": 10,
+      "system_status": 3,
+      "mavlink_version": 3
+    },
+    {
+      "mavpackettype": "HEARTBEAT",
+      "type": 1,
+      "autopilot": 3,
+      "base_mode": 89,
+      "custom_mode": 10,
+      "system_status": 3,
+      "mavlink_version": 3
+    },
+    {
+      "mavpackettype": "HEARTBEAT",
+      "type": 1,
+      "autopilot": 3,
+      "base_mode": 89,
+      "custom_mode": 10,
+      "system_status": 3,
+      "mavlink_version": 3
+    },
+    {
+      "mavpackettype": "HEARTBEAT",
+      "type": 1,
+      "autopilot": 3,
+      "base_mode": 89,
+      "custom_mode": 10,
+      "system_status": 3,
+      "mavlink_version": 3
+    },
+    {
+      "mavpackettype": "HEARTBEAT",
+      "type": 1,
+      "autopilot": 3,
+      "base_mode": 89,
+      "custom_mode": 10,
+      "system_status": 3,
+      "mavlink_version": 3
+    },
+    {
+      "mavpackettype": "HEARTBEAT",
+      "type": 1,
+      "autopilot": 3,
+      "base_mode": 89,
+      "custom_mode": 10,
+      "system_status": 3,
+      "mavlink_version": 3
+    },
+    {
+      "mavpackettype": "HEARTBEAT",
+      "type": 1,
+      "autopilot": 3,
+      "base_mode": 89,
+      "custom_mode": 10,
+      "system_status": 3,
+      "mavlink_version": 3
+    },
+    {
+      "mavpackettype": "HEARTBEAT",
+      "type": 1,
+      "autopilot": 3,
+      "base_mode": 89,
+      "custom_mode": 10,
+      "system_status": 3,
+      "mavlink_version": 3
+    }
+  ],
+  "parameter_values": [
+    {
+      "mavpackettype": "PARAM_VALUE",
+      "param_id": "SERIAL2_PROTOCOL",
+      "param_value": 2.0,
+      "param_type": 2,
+      "param_count": 1256,
+      "param_index": 65535
+    }
+  ]
+}

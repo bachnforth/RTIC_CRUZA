@@ -1,0 +1,8 @@
+[Unit]
+Description=Recover inactive Cruza LTE profile without resetting hardware
+After=NetworkManager.service ModemManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/cruza/cruza.py lte-health
+TimeoutStartSec=60

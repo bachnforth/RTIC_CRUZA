@@ -1,0 +1,4 @@
+.flightlog-deps/
+__pycache__/
+# Large parsed records are reproducible from the retained onboard BIN files.
+logs/**/*.records.json

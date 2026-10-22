@@ -1,17 +1,17 @@
 <#
   Connect a Wi-Fi adapter to the Pocket's ELRS TX backpack and check that MAVLink forwarding works.
 
-  Why this exists: the backpack's network name ("ExpressLRS TX Backpack XXXXXX") has changed on us
-  (217F95 -> A3144A), there are other ELRS radios nearby, and Windows sometimes leaves the adapter on a
-  169.254.x.x address after joining. This script handles all three; it never guesses which radio is yours.
+  The Pocket now uses fixed SSID "ExpressLRS TX Backpack 456B22". Other ELRS radios may still be nearby,
+  and Windows can leave the adapter on a 169.254.x.x address after joining. This script targets the fixed
+  suffix by default, renews DHCP when needed, and retains an interactive scan fallback.
 
   Usage (normal PowerShell, no admin needed):
-      .\tools\connect-backpack.ps1                      # uses adapter "Wi-Fi 2"
-      .\tools\connect-backpack.ps1 -Adapter "Wi-Fi 2" -Pick A3144A   # skip the menu
+      .\tools\connect-backpack.ps1                      # Wi-Fi 2, fixed suffix 456B22
+      .\tools\connect-backpack.ps1 -Pick ''             # interactive scan fallback
 #>
 param(
   [string]$Adapter = 'Wi-Fi 2',
-  [string]$Pick = ''
+  [string]$Pick = '456B22'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -60,6 +60,7 @@ if ($current -like "$prefix*") {
     netsh wlan add profile filename="$tmp" interface="$Adapter" | Out-Null
     Remove-Item $tmp -ErrorAction SilentlyContinue
   }
+  netsh wlan set profileparameter name="$($choice.SSID)" interface="$Adapter" connectionmode=auto | Out-Null
   netsh wlan connect name="$($choice.SSID)" interface="$Adapter" | Out-Null
   Start-Sleep 8
 }

@@ -1,5 +1,10 @@
 **ELRS MAVLink over TX backpack Wi-Fi: backpack never registers the GCS (enabled:false, gcs "IP UNSET")**
 
+> Resolved 2026-10-08. The plain SSID was firmware-update mode, while
+> `Backpack > Telemetry = WiFi` starts the MAVLink service and suffixed AP. The
+> Pocket now has a fixed-UID Backpack 1.5.9 image and stable SSID. See
+> `docs/elrs-backpack.md` for the resolution, firmware, and verified behavior.
+
 **Hardware**
 - Transmitter: RadioMaster Pocket (internal 2.4 GHz ELRS module, EdgeTX)
 - Receiver: BETAFPV SuperD 2.4 GHz (target Unified_ESP32_2400_RX)

@@ -1,0 +1,22 @@
+{
+  "status": "restored",
+  "original": {
+    "BATT_MONITOR": {
+      "value": 4.0,
+      "type": 2
+    }
+  },
+  "changed": [
+    {
+      "parameter": "BATT_MONITOR",
+      "verified_value": 0.0,
+      "action": "prepare"
+    },
+    {
+      "parameter": "BATT_MONITOR",
+      "verified_value": 4.0,
+      "action": "restore"
+    }
+  ],
+  "scope": "Attended USB-only ESC calibration, both props removed per owner; restore before flight"
+}

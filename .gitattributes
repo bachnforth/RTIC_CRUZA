@@ -1,1 +1,6 @@
 firmware/** -text
+logs/**/*.BIN -text
+logs/**/*.bin -text
+logs/**/*.png -text
+companion/** text eol=lf
+dashboard/*.sh text eol=lf
