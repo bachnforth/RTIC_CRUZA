@@ -16,6 +16,7 @@ import subprocess
 import threading
 import time
 from fleet import Limits, VehicleState
+from observations import ObservationStore
 
 # Alert thresholds. Cruza's values copy its own flight-controller settings
 # (BATT_LOW_VOLT 14.0, BATT_CRT_VOLT 13.2, AIRSPEED_MIN 10 in the 2026-10-14
@@ -33,6 +34,8 @@ last_viewer = 0
 last_telemetry_viewer = 0
 feeds = []
 telemetry = []
+observe = None
+observations = ObservationStore()
 media = None
 
 
@@ -313,6 +316,77 @@ class Telemetry:
             STOP.wait(3)
 
 
+class Observe:
+    """Reads the Cruza observation tap over SSH into the shared store. It runs
+    the unprivileged /opt/cruza-observe-tap.py, which has no camera, FC, MAVLink
+    or route access, and it writes nothing back to the aircraft. Advisory only:
+    these records never move an aircraft; the operator validates them and any
+    tasking stays in the preview panel."""
+    def __init__(self, name, host, alias, remote_port, user='ebach'):
+        self.name, self.host, self.alias = name, host, alias
+        self.remote_port, self.user = remote_port, user
+        self.proc = None
+        self.lock = threading.Lock()
+        self.error = ''
+        self.last_record = 0
+        self.thread = threading.Thread(target=self.run, daemon=True)
+
+    def disconnect(self):
+        with self.lock:
+            if self.proc and self.proc.poll() is None:
+                self.proc.terminate()
+
+    def snapshot(self):
+        return dict(connected=time.monotonic()-self.last_record < 12,
+                    error=self.error, items=observations.snapshot())
+
+    def run(self):
+        while not STOP.is_set():
+            if not telemetry_active():
+                STOP.wait(.5)
+                continue
+            argv = ['ssh', '-T', '-i', str(KEY), '-o', 'IdentitiesOnly=yes',
+                    '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes',
+                    '-o', 'ConnectTimeout=6', '-o', 'ServerAliveInterval=5',
+                    '-o', 'ServerAliveCountMax=2', '-o', 'LogLevel=ERROR',
+                    '-o', 'HostKeyAlias='+self.alias, self.user+'@'+self.host,
+                    'python3 /opt/cruza-observe-tap.py --port '+str(self.remote_port)]
+            errors = deque(maxlen=2)
+            try:
+                with self.lock:
+                    self.proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                    proc = self.proc
+                def collect_errors():
+                    for line in iter(proc.stderr.readline, b''):
+                        errors.append(line.decode(errors='replace').strip()[:200])
+                reader = threading.Thread(target=collect_errors, daemon=True)
+                reader.start()
+                while not STOP.is_set() and telemetry_active():
+                    length = struct.unpack('!H', read_exact(proc.stdout, 2))[0]
+                    if not 2 <= length <= 512:
+                        raise ValueError('Invalid observation framing')
+                    raw = read_exact(proc.stdout, length)
+                    observations.add(json.loads(raw))
+                    self.last_record = time.monotonic()
+                    self.error = ''
+            except (EOFError, OSError, ValueError, TypeError) as exc:
+                self.error = ' / '.join(errors) or str(exc)
+            finally:
+                self.disconnect()
+                if self.proc:
+                    try:
+                        self.proc.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        self.proc.kill()
+                        self.proc.wait(timeout=3)
+                    self.proc.stdout.close()
+                    self.proc.stderr.close()
+                    self.proc = None
+            STOP.wait(3)
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass
@@ -352,13 +426,15 @@ class Handler(BaseHTTPRequestHandler):
                 last_telemetry_viewer = time.monotonic()
             raw = json.dumps(dict(active=active(), media_running=media.poll() is None,
                                   feeds=[feed.snapshot() for feed in feeds],
-                                  fleet=[source.snapshot() for source in telemetry]),
+                                  fleet=[source.snapshot() for source in telemetry],
+                                  observations=observe.snapshot() if observe else
+                                  dict(connected=False, error='', items=[])),
                                   allow_nan=False).encode()
             content_type = 'application/json'
         elif path in ('/', '/index.html','/fleet.js','/ticker.js','/fleet.css','/fleet-map.js',
                       '/leaflet.js','/leaflet.css','/world.geojson','/us-states.geojson','/map-state.js',
                       '/alabama-map.js','/al-counties.geojson','/al-places.geojson','/al-roads.geojson',
-                      '/command-preview.js'):
+                      '/command-preview.js','/observations.js'):
             name = 'index.html' if path == '/' else path.lstrip('/')
             raw = (HERE/'dist'/name).read_bytes()
             content_type = {'js':'application/javascript','css':'text/css',
@@ -396,10 +472,13 @@ def supervisor():
         if not telemetry_active():
             for source in telemetry:
                 source.disconnect()
+            if observe:
+                observe.disconnect()
+        observations.expire()
 
 
 def main():
-    global feeds, media, telemetry
+    global feeds, media, telemetry, observe
     exe = HERE/'runtime'/'mediamtx-v1.21.2'/'mediamtx.exe'
     if not exe.is_file() or not KEY.is_file():
         raise SystemExit('MediaMTX runtime or existing SSH key is missing. See README.')
@@ -427,6 +506,10 @@ def main():
                  DirectTelemetry('rn03','100.100.0.6',5760)]
     for source in telemetry:
         source.thread.start()
+    # Cruza observation reader. Advisory areas of interest only; shares the
+    # telemetry viewer lease and never writes to the aircraft.
+    observe = Observe('cruza', '100.100.0.58', '10.229.125.15', 15620)
+    observe.thread.start()
     threading.Thread(target=supervisor, daemon=True).start()
     def stop(*_):
         STOP.set()

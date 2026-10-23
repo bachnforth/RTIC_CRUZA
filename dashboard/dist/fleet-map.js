@@ -81,17 +81,37 @@ let picking=false,candidateMarker=null,selectedPlatform='';
 function cancelPick(){picking=false;document.querySelector('#map').classList.remove('pick-point');}
 function clearCandidate(){cancelPick();if(candidateMarker){map.removeLayer(candidateMarker);candidateMarker=null;}}
 function startPick(){picking=true;follow.checked=false;overviewMode=false;document.querySelector('#map').classList.add('pick-point');document.querySelector('#map').focus();}
+function placeCandidate(lat,lng){
+ if(lat < -90 || lat > 90)return;
+ const loc=[lat,lng];
+ if(!candidateMarker){candidateMarker=L.marker(loc,{keyboard:false,interactive:false,icon:L.divIcon({className:'candidate-pin',html:'<span>+</span>',iconSize:[30,30],iconAnchor:[15,15]})}).addTo(map);candidateMarker.bindTooltip('Candidate destination · preview only',{permanent:true,direction:'bottom'});}else candidateMarker.setLatLng(loc);
+ document.dispatchEvent(new CustomEvent('fleet-candidate',{detail:{latitude:lat,longitude:lng}}));
+}
 map.on('click',event=>{
  if(!picking)return;
  cancelPick();
  const p=event.latlng.wrap();
- if(p.lat < -90 || p.lat > 90)return;
- const loc=[p.lat,p.lng];
- if(!candidateMarker){candidateMarker=L.marker(loc,{keyboard:false,interactive:false,icon:L.divIcon({className:'candidate-pin',html:'<span>+</span>',iconSize:[30,30],iconAnchor:[15,15]})}).addTo(map);candidateMarker.bindTooltip('Candidate destination · preview only',{permanent:true,direction:'bottom'});}else candidateMarker.setLatLng(loc);
- document.dispatchEvent(new CustomEvent('fleet-candidate',{detail:{latitude:p.lat,longitude:p.lng}}));
+ placeCandidate(p.lat,p.lng);
 });
+// Advisory areas of interest from the Cruza observer. Markers only; selecting
+// one never tasks an aircraft. Promotion to a candidate point stays manual.
+const aoiLayer=L.layerGroup().addTo(map);const aoiMarkers={};
+function setAOIs(list){
+ const keep=new Set();
+ for(const a of list){
+  if(!Number.isFinite(a.lat)||!Number.isFinite(a.lon))continue;
+  keep.add(a.id);const loc=[a.lat,a.lon];
+  const html=`<span>⬥</span>`;
+  if(!aoiMarkers[a.id]){aoiMarkers[a.id]=L.marker(loc,{keyboard:false,interactive:false,icon:L.divIcon({className:'aoi-pin',html,iconSize:[26,26],iconAnchor:[13,13]})}).addTo(aoiLayer);}
+  else aoiMarkers[a.id].setLatLng(loc);
+  aoiMarkers[a.id].bindTooltip(a.label||'Area of interest',{permanent:false,direction:'top'});
+ }
+ for(const id of Object.keys(aoiMarkers))if(!keep.has(id)){aoiLayer.removeLayer(aoiMarkers[id]);delete aoiMarkers[id];}
+}
+// Set a candidate programmatically (e.g. from a validated area of interest).
+function setCandidate(lat,lon){cancelPick();placeCandidate(lat,lon);}
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&picking){cancelPick();document.dispatchEvent(new Event('fleet-pick-cancelled'));}});
 function highlightPlatform(){for(const [id,group] of Object.entries(layers)){if(group.marker)group.marker.setRadius(id===selectedPlatform?13:9);}}
 document.addEventListener('fleet-preview-platform',event=>{selectedPlatform=event.detail;highlightPlatform();});
-window.fleetMap={update:fleet=>{update(fleet);highlightPlatform();},startPick,clearCandidate,cancelPick};
+window.fleetMap={update:fleet=>{update(fleet);highlightPlatform();},startPick,clearCandidate,cancelPick,setCandidate,setAOIs};
 })();
