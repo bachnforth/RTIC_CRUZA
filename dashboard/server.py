@@ -28,7 +28,7 @@ LIMITS = {'cruza': Limits(battery_low_v=14.0, battery_critical_v=13.2, airspeed_
 HERE = Path(__file__).resolve().parent
 IMAGERY = HERE/'runtime'/'imagery'
 IMAGERY_PATH = re.compile(r'/imagery/(manifest\.json|\d{1,2}/\d{1,7}/\d{1,7})')
-KEY = Path.home()/'.ssh'/'id_ed25519_rpi'
+KEY = Path.home()/'.ssh'/'id_ed25519_pi'
 STOP = threading.Event()
 last_viewer = 0
 last_telemetry_viewer = 0
@@ -58,9 +58,10 @@ def read_exact(stream, length):
 
 
 class Feed:
-    def __init__(self, name, host, alias, remote_port, local_port):
+    def __init__(self, name, host, alias, remote_port, local_port, user='ebach'):
         self.name, self.host, self.alias = name, host, alias
         self.remote_port, self.local_port = remote_port, local_port
+        self.user = user
         self.proc = None
         self.lock = threading.Lock()
         self.total = self.packets = self.last_packet = 0
@@ -88,7 +89,7 @@ class Feed:
                         '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes',
                         '-o', 'ConnectTimeout=6', '-o', 'ServerAliveInterval=5',
                         '-o', 'ServerAliveCountMax=2', '-o', 'LogLevel=ERROR',
-                        '-o', 'HostKeyAlias='+self.alias, 'ebach@'+self.host,
+                        '-o', 'HostKeyAlias='+self.alias, self.user+'@'+self.host,
                         'python3 /opt/cruza-video-tap.py --port '+str(self.remote_port)]
                 errors = deque(maxlen=2)
                 try:
@@ -497,18 +498,18 @@ def main():
     log_thread = threading.Thread(target=media_logs, daemon=True)
     log_thread.start()
     (HERE/'runtime'/'dashboard.pid').write_text(str(os.getpid()))
-    feeds = [Feed('cruza', '100.100.0.58', '10.229.125.15', 15600, 18000),
+    feeds = [Feed('cruza', '100.100.0.34', '100.100.0.34', 15600, 18000, user='jbrascom'),
              Feed('quadpi', '10.223.79.20', '10.223.79.20', 15601, 18002)]
     for feed in feeds:
         feed.thread.start()
-    telemetry = [Telemetry('cruza','100.100.0.58','10.229.125.15',15610),
+    telemetry = [Telemetry('cruza','100.100.0.34','100.100.0.34',15610,user='jbrascom'),
                  Telemetry('quadpi','10.223.79.20','10.223.79.20',15611),
                  DirectTelemetry('rn03','100.100.0.6',5760)]
     for source in telemetry:
         source.thread.start()
     # Cruza observation reader. Advisory areas of interest only; shares the
     # telemetry viewer lease and never writes to the aircraft.
-    observe = Observe('cruza', '100.100.0.58', '10.229.125.15', 15620)
+    observe = Observe('cruza', '100.100.0.34', '100.100.0.34', 15620, user='jbrascom')
     observe.thread.start()
     threading.Thread(target=supervisor, daemon=True).start()
     def stop(*_):

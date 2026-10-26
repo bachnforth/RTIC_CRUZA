@@ -79,21 +79,26 @@ def router(c):
 
 
 def video(c):
-    dest = tail_ip(c["android_ip"])
+    # Primary Android plus any extra GCS phones in android_ip2 (str or list).
+    dests = [tail_ip(c["android_ip"])]
+    extra = c.get("android_ip2") or []
+    for e in ([extra] if isinstance(extra, str) else extra):
+        if e:
+            dests.append(tail_ip(e))
     if run(["tailscale", "ip", "-4"])["code"]:
         raise RuntimeError("Tailscale is not ready")
     w, h, fps, bitrate = PROFILES[c["video_profile"]]
     capture = ["rpicam-vid", "--nopreview", "--timeout", "0", "--width", str(w),
                "--height", str(h), "--framerate", str(fps), "--codec", "h264",
                "--bitrate", str(bitrate), "--inline", "--intra", str(fps), "--output", "-"]
-    pipeline = ["gst-launch-1.0", "-q", "fdsrc", "!", "h264parse", "!", "rtph264pay",
-                "pt=96", "config-interval=1", "mtu=1200", "!", "udpsink",
-                f"host={dest}", f"port={c['video_port']}", "sync=false", "async=false",
-                "qos-dscp=8"]
+    # One encoded RTP stream fanned out to every configured phone, plus the
+    # optional loopback mirror the dashboard taps.
+    clients = ",".join(f"{d}:{c['video_port']}" for d in dests)
     if c.get("video_mirror_port", 0):
-        pipeline = pipeline[:pipeline.index("udpsink")] + ["multiudpsink",
-                    f"clients={dest}:{c['video_port']},127.0.0.1:{c['video_mirror_port']}",
-                    "sync=false", "async=false", "qos-dscp=8"]
+        clients += f",127.0.0.1:{c['video_mirror_port']}"
+    pipeline = ["gst-launch-1.0", "-q", "fdsrc", "!", "h264parse", "!", "rtph264pay",
+                "pt=96", "config-interval=1", "mtu=1200", "!", "multiudpsink",
+                f"clients={clients}", "sync=false", "async=false", "qos-dscp=8"]
     emit("video_start", profile=c["video_profile"], bitrate=bitrate,
          max_seconds=c["video_max_seconds"])
     processes = []

@@ -1,0 +1,23 @@
+[Unit]
+Description=Cruza IMX500 video + observation (one camera, both outputs)
+After=network-online.target tailscaled.service cruza-firewall.service
+Wants=network-online.target tailscaled.service
+# Camera-only. Streams H264/RTP to the configured phones and publishes advisory
+# detection records. No FC, MAVLink, route or modem access.
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=jbrascom
+SupplementaryGroups=video render
+ExecStart=/usr/bin/python3 /opt/cruza/stream.py
+Restart=on-failure
+RestartSec=20
+KillMode=control-group
+TimeoutStopSec=15
+Nice=10
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
