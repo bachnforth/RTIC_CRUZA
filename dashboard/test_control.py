@@ -27,7 +27,9 @@ class FakeBridge:
             self.sock.sendto(message.pack(self.encoder), self.peer)
 
     # The FC's own circle settings, answered to PARAM_REQUEST_READ.
-    params = {'CIRCLE_RADIUS_M': 10.0, 'CIRCLE_RATE': 20.0, 'CIRCLE_OPTIONS': 5.0, 'RCMAP_THROTTLE': 3.0}
+    params = {'CIRCLE_RADIUS_M': 10.0, 'CIRCLE_RATE': 20.0, 'CIRCLE_OPTIONS': 5.0, 'RCMAP_THROTTLE': 3.0,
+              'MAV_GCS_SYSID': 255.0}
+    mission = []                    # MISSION_ITEM_INT messages served on request
 
     def vehicle(self, armed=False, mode=4, landed=mav.MAV_LANDED_STATE_ON_GROUND, alt=0.0,
                 lat=35.0495395, lon=-79.4901843, throttle=1500):
@@ -48,6 +50,10 @@ class FakeBridge:
             except socket.timeout:
                 continue
             for m in parser.parse_buffer(data) or []:
+                if m.get_type() == 'MISSION_REQUEST_LIST':
+                    self.emit(mav.MAVLink_mission_count_message(255, 0, len(self.mission), 0))
+                if m.get_type() == 'MISSION_REQUEST_INT' and m.seq < len(self.mission):
+                    self.emit(self.mission[m.seq])
                 if m.get_type() == 'PARAM_REQUEST_READ' and m.param_id in self.params:
                     self.emit(mav.MAVLink_param_value_message(
                         m.param_id.encode(), self.params[m.param_id], mav.MAV_PARAM_TYPE_REAL32, 999, 0))
@@ -76,10 +82,13 @@ class ControlTests(unittest.TestCase):
         while not bridge.peer and time.time() < deadline:
             time.sleep(.05)
         bridge.vehicle(**vehicle)
+        deadline = time.time()+8
         while time.time() < deadline:
             v = q.vehicle()
-            if v['online'] and v['position'] and v['in_air'] is not None:
+            if v['online'] and v['position'] and v['in_air'] is not None and 'MAV_GCS_SYSID' in q.params:
                 break
+            if not v['online']:
+                bridge.vehicle(**vehicle)
             time.sleep(.05)
         return q
 
@@ -129,6 +138,27 @@ class ControlTests(unittest.TestCase):
         self.assertFalse(entry['ok'])
         self.assertIn('Arm refused (FAILED)', entry['result'])
         self.assertEqual(len(bridge.received), 1)
+
+    def test_adopts_fc_gcs_id_and_waits_for_it(self):
+        bridge = FakeBridge()
+        bridge.params = dict(bridge.params, MAV_GCS_SYSID=254.0)
+        q = self.link(bridge, mode=0)
+        self.assertEqual(q.status()['gcs_id'], 254)
+        bridge.received.clear()
+        q.execute(dict(action='arm'))
+        self.assertEqual([m.get_srcSystem() for m in bridge.received], [254])
+        unknown = FakeBridge()
+        unknown.params = {k: v for k, v in unknown.params.items() if k != 'MAV_GCS_SYSID'}
+        q2 = control.QuadControl(unknown.sock.getsockname(), Path(self.tmp.name)/'l2', lambda: True,
+                                 stop=self.stop)
+        q2.start()
+        deadline = time.time()+3
+        while not unknown.peer and time.time() < deadline:
+            time.sleep(.05)
+        unknown.vehicle(mode=0)
+        time.sleep(.5)
+        self.assertIn('GCS system id not read', q2.execute(dict(action='arm'))['result'])
+        self.assertEqual(unknown.received, [])
 
     def test_refusal_reason_arriving_after_ack_is_included(self):
         bridge = FakeBridge(result=mav.MAV_RESULT_FAILED)

@@ -34,6 +34,14 @@
     if (a.id === 'arm_takeoff' && link.armed) return 'Already armed. Use Fly to point & hold, Hold, RTL or Land.';
     if (a.id === 'arm_takeoff' && !link.position) return 'No position fix yet; GUIDED takeoff needs GPS.';
     if (a.id === 'goto' && (!link.armed || link.in_air === false)) return 'Take off first.';
+    if (a.id === 'arm_mission') {
+      const m = live()?.mission;
+      if (link.armed) return 'Already armed: the mission launch starts from the ground.';
+      if (!link.position) return 'No position fix yet; the mission needs GPS.';
+      if (!m?.known) return `Reading the mission from the aircraft…${m?.error ? ' (' + m.error + ')' : ''}`;
+      if (m.first !== 'NAV_TAKEOFF') return `The mission must start with a takeoff (first item is ${m.first}).`;
+      if (m.farthest_m == null) return 'Mission home is not set yet (needs a GPS fix).';
+    }
     if (a.id === 'loiter') {
       const c = live()?.circle;
       if (!link.armed || link.in_air === false) return 'Take off first.';
@@ -109,6 +117,10 @@
     $('#wf-build').disabled = sending || !platform.value || !a || (a.point === true && !candidate) || altitudeValue(a) === undefined || !!why;
     $('#wf-build').textContent = isLive ? '4 · Review command' : '4 · Review preview';
     // One-click row for the live platform.
+    // Show the loaded mission's route while its launch is selected.
+    const m = control?.mission;
+    if (isLive && a?.id === 'arm_mission' && m?.known && m.route?.length) window.fleetMap.showRoute(m.route, m.home);
+    else window.fleetMap.clearRoute();
     // Only the immediate commands this link offers (the bench link has none).
     const quick = $('#wf-quick'), offered = new Set((control?.actions || []).map(x => x.id));
     quick.hidden = !isLive || !quick.querySelector('button[data-action]') ||
@@ -125,9 +137,9 @@
       return li;
     }));
   }
-  async function send(id) {
+  async function send(id, extra = {}) {
     const a = actionsFor(platform.value).find(x => x.id === id), target = platform.value;
-    const body = {platform: target, action: id};
+    const body = Object.assign({platform: target, action: id}, extra);
     if (needsAltitude(a)) body.altitude_m = altitudeValue(a);
     if (usesPoint(a)) Object.assign(body, {latitude: candidate.latitude, longitude: candidate.longitude});
     sending = true; invalidate(); render();
@@ -172,7 +184,13 @@
     window.fleetMap.cancelPick();
     const a = action(), isLive = !!live();
     let sentence = `${names[platform.value]} — ${a.label}. `;
-    if (a.id === 'loiter' && isLive) {
+    if (a.id === 'arm_mission' && isLive) {
+      const m = live().mission;
+      sentence += `Mission on the aircraft (read ${m.age_s} s ago): ${m.count} items, ${m.waypoints} waypoints. ` +
+        `Takes off to ${m.takeoff_m} m, highest ${m.max_alt_m} m above home, farthest ${m.farthest_m} m from home, ` +
+        `ends with ${m.last}. The route is shown on the map. Pocket throttle low to arm; take over with the mode switch. `;
+      if (m.non_rel_alt) sentence += `${m.non_rel_alt} items use absolute or terrain altitude; check them in your GCS. `;
+    } else if (a.id === 'loiter' && isLive) {
       const c = live().circle;
       sentence += candidate ? `Fly to ${coordinates(candidate)} at ${altitudeValue(a)} m above home, then circle. `
         : 'Circle where it is now, at its current altitude. ';
@@ -191,14 +209,16 @@
     $('#wf-confirm').textContent = isLive ? `Send to ${names[platform.value]}` : 'Complete preview · no transmission';
     $('#wf-review').hidden = false;
     $('#wf-confirm').disabled = false;
-    reviewed = {platform: platform.value, action: a.id, live: isLive};
+    reviewed = {platform: platform.value, action: a.id, live: isLive,
+                // The server refuses the launch if the aircraft's mission no longer matches this.
+                extra: a.id === 'arm_mission' && isLive ? {mission_signature: live().mission.signature} : {}};
     result.className = '';
     result.textContent = isLive ? `Review expires in ${REVIEW_SECONDS} s.` : '';
     if (isLive) reviewTimer = setTimeout(() => { invalidate(); result.textContent = 'Review expired; nothing sent.'; }, REVIEW_SECONDS * 1000);
   };
   $('#wf-confirm').onclick = () => {
     if (!reviewed) return;
-    if (reviewed.live && controls[reviewed.platform]) { send(reviewed.action); return; }
+    if (reviewed.live && controls[reviewed.platform]) { send(reviewed.action, reviewed.extra); return; }
     invalidate();
     result.className = '';
     result.textContent = 'Preview completed locally. Nothing was transmitted; aircraft state has not changed.';

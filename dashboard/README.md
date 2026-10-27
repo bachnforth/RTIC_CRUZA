@@ -126,6 +126,40 @@ GUIDED arming unless the throttle is low ("Throttle (RC3) is not neutral"), so
 the pilot centres it only after takeoff, before Loiter. 52 dashboard tests and
 19 bridge tests pass.
 
+### Arm & fly mission (27 October 2026) — SITL-tested only
+
+**Arm & fly mission** launches the waypoint mission already loaded on quadpi
+(uploaded from QGC or Mission Planner as before) straight from the ground:
+GUIDED → arm → `MISSION_START` (whole mission), each step acknowledged before
+the next. ArduCopter accepts `MISSION_START` even while disarmed, so it is only
+sent after the arm has been accepted. The mission's own `NAV_TAKEOFF` lifts off;
+the Pocket throttle stays low (GUIDED arming needs it low) and `AUTO_OPTIONS`
+does not need changing.
+
+While quadpi is on the ground the dashboard reads the mission (MISSION_REQUEST_*
+only, never an upload) every 2 minutes and immediately after the FC announces
+"Flight plan received". The review lists the item count, takeoff height,
+highest altitude, farthest distance from home and the final command, and the
+route is drawn on the map (dashed yellow). At Send the server re-reads the
+mission and refuses if it no longer matches what was reviewed. A launch is
+refused unless the first navigation item is a takeoff, the highest altitude is
+at most 120 m and nothing is more than 1.5 km from home. Hold (BRAKE), RTL and
+Land take over mid-mission; the Pocket mode switch overrides everything, and
+its AUTO position (6) resumes the mission. With `FS_OPTIONS`=1 a GCS link loss
+lets the mission continue.
+
+The bridge allowlist gains only `MISSION_START` with all parameters 0
+(starting at a chosen item, AUTO by mode change and `DO_SET_MISSION_CURRENT`
+stay blocked).
+
+SITL, 27 October (simulator at quadpi's home, quadpi's own 63-item mission
+uploaded through the bridge): the dashboard read it in ~2 s (takeoff 30 m,
+highest 50 m, farthest 464 m, ends with RTL); Arm & fly mission from the
+workflow armed in GUIDED, switched to AUTO, climbed to 30.0 m, then flew south
+at the mission's 5 m/s and climbed toward 50 m; Hold stopped it at 50 m
+(0.1 m/s), RTL brought it home. The bridge blocked nothing. Note: Tailscale
+holds UDP 14551 on this laptop, so the local SITL bridge listened on 14561.
+
 ### Before using it on the real quad (phase 2, props off, then phase 3)
 
 1. Back up the live bridge on quadpi, install the new `safety_mavlink_filter.py`,

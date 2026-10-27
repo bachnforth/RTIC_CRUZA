@@ -9,6 +9,7 @@ While a dashboard page is open this link sends a 1 Hz GCS heartbeat (which also
 keeps the bridge copying FC traffic here). Closing every page stops it, so with
 FS_GCS_ENABLE set the aircraft fails safe if no other GCS is connected.
 """
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -27,6 +28,10 @@ MODE_NAMES = {0: 'STABILIZE', 1: 'ACRO', 2: 'ALT_HOLD', 3: 'AUTO', 4: 'GUIDED',
               20: 'GUIDED_NOGPS', 21: 'SMART_RTL'}
 MAX_ALTITUDE_M = 120.0          # same limit as the Pi bridge
 MAX_GOTO_DISTANCE_M = 1000.0    # from the quad's current position
+MAX_MISSION_DISTANCE_M = 1500.0 # farthest mission item from home
+MISSION_FRESH_S = 600           # a launch needs a mission read this recently
+MISSION_REFRESH_S = 120         # re-read the mission this often while on the ground
+REL_ALT_FRAMES = {3, 6}         # MAV_FRAME_GLOBAL_RELATIVE_ALT(_INT)
 ACK_TIMEOUT = 3.0
 FRESH = 3.0                     # seconds a heartbeat/position stays usable
 STREAMS = (2, 3, 6, 10, 11, 12)  # EXTENDED_STATUS, RC, POSITION, EXTRA1-3
@@ -34,7 +39,12 @@ ARM_ONLY_MODES = {0, 2, 5, 16}   # STABILIZE, ALT_HOLD, LOITER, POSHOLD
 CIRCLE = 7
 # The circle is the FC's own: radius, rate (sign = direction) and options are
 # read, never written. RCMAP_THROTTLE says which RC channel is throttle.
-CIRCLE_PARAMS = ('CIRCLE_RADIUS_M', 'CIRCLE_RADIUS', 'CIRCLE_RATE', 'CIRCLE_OPTIONS', 'RCMAP_THROTTLE')
+CIRCLE_PARAMS = ('CIRCLE_RADIUS_M', 'CIRCLE_RADIUS', 'CIRCLE_RATE', 'CIRCLE_OPTIONS', 'RCMAP_THROTTLE',
+                 'MAV_GCS_SYSID', 'SYSID_MYGCS')
+# The FC only counts heartbeats from its configured GCS system id
+# (MAV_GCS_SYSID, SYSID_MYGCS before 4.7) for GCS failsafe, so the UDP link
+# adopts that id once read and sends no commands until it knows it.
+GCS_ID_PARAMS = ('MAV_GCS_SYSID', 'SYSID_MYGCS')
 CIRCLE_START_AT_CENTRE = 4      # CIRCLE_OPTIONS bit: circle around where it enters
 THROTTLE_CENTRE = (1400, 1600)  # PWM band treated as "Pocket throttle centred"
 ARRIVE_M = 3.0                  # switch to CIRCLE this close to the chosen point
@@ -45,6 +55,10 @@ ACTION_INFO = [
     dict(id='arm', label='Arm motors (current mode)', point=False, altitude=False,
          text='Arms in the mode the Pocket’s switch has selected; no mode change, no takeoff. '
               'Motors spin at idle and the aircraft disarms itself after DISARM_DELAY on the ground.'),
+    dict(id='arm_mission', label='Arm & fly mission', point=False, altitude=False,
+         text='Switches to GUIDED, arms, then starts the waypoint mission already loaded on the '
+              'aircraft from its first item; the mission’s own takeoff lifts off. The review lists '
+              'what the mission does. Take over with the Pocket mode switch at any time.'),
     dict(id='arm_takeoff', label='Arm & take off', point=False, altitude=True,
          text='Switches to GUIDED, arms and climbs straight up to the altitude. Props will spin.'),
     dict(id='goto', label='Fly to point & hold', point=True, altitude=True,
@@ -107,6 +121,7 @@ class QuadControl:
         self.log_path = Path(log_path)
         self.state = VehicleState('quadpi', limits=limits)
         self.encoder = mav.MAVLink(None, srcSystem=gcs[0], srcComponent=gcs[1])
+        self.adopt_gcs_id = True                  # the bench link keeps its fixed 254
         self.parser = mav.MAVLink(None)
         self.parser.robust_parsing = True
         self.open_link()
@@ -120,6 +135,11 @@ class QuadControl:
         self.params = {}                          # circle-related FC parameters
         self.rc = None                            # (RC_CHANNELS, time)
         self.pending_circle = None                # point to circle on arrival
+        self.mission = None                       # summary of the loaded mission
+        self.mission_error = ''
+        self.mission_dirty = False                # FC announced a new flight plan
+        self.mission_rx = {}                      # replies for the mission reader
+        self.mcond = threading.Condition()
         self.last_rx = 0.0
         self.busy = ''
         self.history = []
@@ -127,6 +147,7 @@ class QuadControl:
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.sender = threading.Thread(target=self.send_heartbeats, daemon=True)
         self.watcher = threading.Thread(target=self.watch_circle, daemon=True)
+        self.mission_thread = threading.Thread(target=self.watch_mission, daemon=True)
         self.state.reset_boot(f'control:{target[0]}:{time.time():.0f}')
 
     # ---- telemetry-source interface used by server.py -------------------
@@ -143,6 +164,8 @@ class QuadControl:
         self.thread.start()
         self.sender.start()
         self.watcher.start()
+        if 'arm_mission' in self.action_ids:
+            self.mission_thread.start()
 
     # ---- link ------------------------------------------------------------
     def open_link(self):
@@ -231,6 +254,95 @@ class QuadControl:
                 self.busy = ''
                 self.lock.release()
 
+    # ---- loaded waypoint mission (read only) -----------------------------
+    def wait_mission_reply(self, key, timeout):
+        with self.mcond:
+            end = time.monotonic()+timeout
+            while key not in self.mission_rx:
+                left = end-time.monotonic()
+                if left <= 0:
+                    return None
+                self.mcond.wait(left)
+            return self.mission_rx.pop(key)
+
+    def read_mission(self):
+        """Download the mission with the standard read protocol (allowed by
+        the bridge); never uploads or changes it."""
+        with self.mcond:
+            self.mission_rx.clear()
+        count = None
+        for _ in range(3):
+            self.send(mav.MAVLink_mission_request_list_message(*QUAD, mav.MAV_MISSION_TYPE_MISSION))
+            count = self.wait_mission_reply('count', 3)
+            if count:
+                break
+        if count is None:
+            raise CommandError('no mission count from the aircraft')
+        items = []
+        for seq in range(count.count):
+            for _ in range(3):
+                self.send(mav.MAVLink_mission_request_int_message(*QUAD, seq, mav.MAV_MISSION_TYPE_MISSION))
+                item = self.wait_mission_reply(seq, 2)
+                if item:
+                    items.append(item)
+                    break
+            else:
+                raise CommandError(f'mission item {seq} not received')
+        self.send(mav.MAVLink_mission_ack_message(*QUAD, mav.MAV_MISSION_ACCEPTED,
+                                                  mav.MAV_MISSION_TYPE_MISSION))
+        return items
+
+    @staticmethod
+    def summarise(items):
+        """What a launch would fly: takeoff, heights, reach, last command, route."""
+        name = lambda c: mav.enums['MAV_CMD'][c].name.replace('MAV_CMD_', '') \
+            if c in mav.enums['MAV_CMD'] else str(c)
+        home = (items[0].x/1e7, items[0].y/1e7) if items and items[0].x else None
+        body = items[1:]                                   # item 0 is home
+        nav = [i for i in body if i.command < mav.MAV_CMD_NAV_LAST]
+        route = [(i.x/1e7, i.y/1e7) for i in nav if i.x and i.y]
+        alts = [i.z for i in nav if i.frame in REL_ALT_FRAMES and i.command != mav.MAV_CMD_NAV_LAND]
+        takeoff = next((i for i in nav[:1] if i.command == mav.MAV_CMD_NAV_TAKEOFF), None)
+        farthest = max((distance_m(home[0], home[1], lat, lon) for lat, lon in route), default=0) if home else None
+        signature = hashlib.sha1(repr([(i.seq, i.frame, i.command, i.param1, i.param2, i.param3, i.param4,
+                                         i.x, i.y, round(i.z, 3)) for i in items]).encode()).hexdigest()[:16]
+        return dict(count=len(items), waypoints=len(route), signature=signature,
+                    first=name(nav[0].command) if nav else None,
+                    takeoff_m=takeoff.z if takeoff else None,
+                    max_alt_m=max(alts) if alts else None,
+                    farthest_m=round(farthest) if farthest is not None else None,
+                    last=name(body[-1].command) if body else None,
+                    non_rel_alt=sum(1 for i in nav if i.x and i.frame not in REL_ALT_FRAMES),
+                    home=home, route=route)
+
+    def watch_mission(self):
+        """Keep a fresh copy of the mission while the quad is on the ground."""
+        while not self.stop.wait(2):
+            v = self.vehicle()
+            age = time.monotonic()-self.mission['read_at'] if self.mission else None
+            fresh = age is not None and age < MISSION_REFRESH_S and not self.mission_dirty
+            if not self.active() or not v['online'] or v['armed'] or fresh:
+                continue
+            try:
+                self.refresh_mission()
+            except (CommandError, OSError) as exc:
+                self.mission_error = str(exc)
+                self.stop.wait(10)
+
+    def refresh_mission(self):
+        self.mission_dirty = False
+        summary = self.summarise(self.read_mission())
+        summary['read_at'] = time.monotonic()
+        self.mission, self.mission_error = summary, ''
+        return summary
+
+    def mission_status(self):
+        if not self.mission:
+            return dict(known=False, error=self.mission_error)
+        m = dict(self.mission)
+        m['age_s'] = round(time.monotonic()-m.pop('read_at'))
+        return dict(m, known=True, error=self.mission_error)
+
     def send_heartbeats(self):
         last_request = last_params = 0.0
         while not self.stop.wait(1):
@@ -285,8 +397,21 @@ class QuadControl:
                     self.landed = (message.landed_state, now)
                 elif kind == 'STATUSTEXT':
                     self.texts = (self.texts+[(now, message.text)])[-8:]
+                    if message.text.startswith('Flight plan received'):
+                        self.mission_dirty = True         # someone uploaded a mission
                 elif kind == 'PARAM_VALUE' and message.param_id in CIRCLE_PARAMS:
                     self.params[message.param_id] = message.param_value
+                    if message.param_id in GCS_ID_PARAMS and self.adopt_gcs_id:
+                        gcs_id = int(message.param_value)
+                        if 1 <= gcs_id <= 255 and gcs_id != self.gcs[0]:
+                            self.gcs = (gcs_id, self.gcs[1])
+                            self.encoder = mav.MAVLink(None, srcSystem=gcs_id, srcComponent=self.gcs[1])
+                elif kind in ('MISSION_COUNT', 'MISSION_ITEM_INT') and \
+                        getattr(message, 'mission_type', 0) == mav.MAV_MISSION_TYPE_MISSION:
+                    with self.mcond:
+                        key = 'count' if kind == 'MISSION_COUNT' else message.seq
+                        self.mission_rx[key] = message
+                        self.mcond.notify_all()
                 elif kind == 'RC_CHANNELS':
                     self.rc = (message, now)
                 elif kind == 'COMMAND_ACK' and message.target_system in (self.gcs[0], 0):
@@ -311,7 +436,8 @@ class QuadControl:
 
     def status(self):
         return dict(enabled=True, target=self.label, link=self.vehicle(),
-                    actions=self.actions, circle=self.circle_info(),
+                    actions=self.actions, circle=self.circle_info(), gcs_id=self.gcs[0],
+                    mission=self.mission_status(),
                     busy=self.busy, history=self.history[-6:], error=self.error,
                     max_altitude_m=MAX_ALTITUDE_M, max_distance_m=MAX_GOTO_DISTANCE_M)
 
@@ -387,6 +513,8 @@ class QuadControl:
         v = self.vehicle()
         if not v['online']:
             raise CommandError('No recent heartbeat from quadpi')
+        if self.adopt_gcs_id and not any(p in self.params for p in GCS_ID_PARAMS):
+            raise CommandError('GCS system id not read from the aircraft yet; try again shortly')
         if action == 'arm':
             if v['armed']:
                 raise CommandError('Already armed')
@@ -397,6 +525,38 @@ class QuadControl:
                                    '(or ALT_HOLD/LOITER/POSHOLD) before arming')
             entry['mode'] = v['mode']
             return [lambda: self.arm(True)]
+        if action == 'arm_mission':
+            if v['armed']:
+                raise CommandError('Already armed; Arm & fly mission starts from the ground')
+            if v['in_air']:
+                raise CommandError('In the air; use the Pocket AUTO switch position or land first')
+            if not v['position']:
+                raise CommandError('No position fix; the mission needs GPS')
+            m = self.mission
+            if not m or time.monotonic()-m['read_at'] > MISSION_FRESH_S:
+                raise CommandError('Mission not read from the aircraft recently; wait a few seconds'
+                                   + (f' ({self.mission_error})' if self.mission_error else ''))
+            # Re-read now: launch only what was reviewed.
+            m = self.refresh_mission()
+            if body.get('mission_signature') != m['signature']:
+                raise CommandError('The mission on the aircraft changed since your review; review it again')
+            if m['first'] != 'NAV_TAKEOFF':
+                raise CommandError(f'Mission must start with a takeoff (first item is {m["first"]})')
+            if m['max_alt_m'] is not None and m['max_alt_m'] > MAX_ALTITUDE_M:
+                raise CommandError(f'Mission climbs to {m["max_alt_m"]:g} m; limit is {MAX_ALTITUDE_M:g} m')
+            if m['farthest_m'] is None:
+                raise CommandError('Mission home is not set yet (needs a GPS fix); try again once it has one')
+            if m['farthest_m'] > MAX_MISSION_DISTANCE_M:
+                raise CommandError(f'Mission reaches {m["farthest_m"]} m from home; limit is '
+                                   f'{MAX_MISSION_DISTANCE_M:.0f} m')
+            entry.update(mission_items=m['count'], takeoff_m=m['takeoff_m'], max_alt_m=m['max_alt_m'],
+                         farthest_m=m['farthest_m'], ends_with=m['last'])
+            steps = [] if v['mode_id'] == GUIDED else [lambda: self.set_mode(GUIDED)]
+            # MISSION_START is accepted even while disarmed, so it is only sent
+            # after the arm step has been acknowledged.
+            return steps+[lambda: self.arm(True),
+                          lambda: self.command('Start mission', mav.MAV_CMD_MISSION_START,
+                                               self.long(mav.MAV_CMD_MISSION_START, 0, 0))]
         if action == 'arm_takeoff':
             alt = number(body, 'altitude_m', 1, MAX_ALTITUDE_M)
             entry['altitude_m'] = alt
@@ -517,6 +677,7 @@ class BenchControl(QuadControl):
         self.send_lock = threading.Lock()
         super().__init__(('127.0.0.1', self.local_port), log_path, active, limits, stop,
                          gcs=BENCH_GCS, actions=BENCH_ACTIONS)
+        self.adopt_gcs_id = False                 # the bench port only accepts 254
         self.label = (f'bench port {BENCH_REMOTE_PORT} on {self.tunnel_host} (SSH)'
                       if self.tunnel_host else f'bench port {self.label}')
         # A relayed VPN link can take seconds each way; wait longer for replies.

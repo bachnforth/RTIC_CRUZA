@@ -93,5 +93,9 @@ map.on('click',event=>{
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&picking){cancelPick();document.dispatchEvent(new Event('fleet-pick-cancelled'));}});
 function highlightPlatform(){for(const [id,group] of Object.entries(layers)){if(group.marker)group.marker.setRadius(id===selectedPlatform?13:9);}}
 document.addEventListener('fleet-preview-platform',event=>{selectedPlatform=event.detail;highlightPlatform();});
-window.fleetMap={update:fleet=>{update(fleet);highlightPlatform();},startPick,clearCandidate,cancelPick};
+// Loaded mission route, shown while "Arm & fly mission" is selected (read from the aircraft).
+let route=null,routeKey='';
+function showRoute(points,home){const key=JSON.stringify([points,home]);if(key===routeKey)return;clearRoute();routeKey=key;const line=home?[home,...points]:points;if(line.length<2)return;route=L.layerGroup([L.polyline(line,{color:'#ffd68a',weight:2,dashArray:'6 5',interactive:false}),...points.slice(0,1).map(p=>L.circleMarker(p,{radius:5,color:'#ffd68a',fillOpacity:1,interactive:false}).bindTooltip('Mission start',{direction:'top'}))]).addTo(map);route.getLayers()[0].bindTooltip('Loaded mission (read from aircraft)',{sticky:true});}
+function clearRoute(){if(route){map.removeLayer(route);route=null;}routeKey='';}
+window.fleetMap={update:fleet=>{update(fleet);highlightPlatform();},startPick,clearCandidate,cancelPick,showRoute,clearRoute};
 })();
