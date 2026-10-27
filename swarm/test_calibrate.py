@@ -28,12 +28,15 @@ TRUTH = {'lat': 33.7312, 'lon': -85.9151, 'cls': 'person'}
 
 
 def synth(mount, count=20, agl=90.0, off_az=0.0, depression=None,
-          config=None, start=1793000000.0, headings=None):
+          config=None, start=1793000000.0, headings=None, stamp=True):
     """Records and a matching flight log for a camera with a known mount.
 
     config, when given, is the field of view the detector *believes*, so a
     mismatch with mount's real field of view simulates an uncalibrated lens the
     way observe.py would report it.
+
+    stamp mirrors observe.py writing that believed field of view into each
+    record. Pass stamp=False to simulate a capture taken before it did.
     """
     rows = []
     for i in range(count):
@@ -54,6 +57,9 @@ def synth(mount, count=20, agl=90.0, off_az=0.0, depression=None,
             cy = 0.5-record['el_rel_deg']/mount['vfov']
             record['az_rel_deg'] = round((cx-0.5)*config['hfov'], 2)
             record['el_rel_deg'] = round((0.5-cy)*config['vfov'], 2)
+        if stamp:
+            believed = config or {'hfov': mount['hfov'], 'vfov': mount['vfov']}
+            record['fov'] = [believed['hfov'], believed['vfov']]
         record['t'] = round(start+i, 2)
         rows.append((record, lat, lon, agl, heading, pitch))
     return rows
@@ -498,6 +504,125 @@ class FovTests(unittest.TestCase):
         out = run(calibrate.fov, records=records, log=log, cls='person',
                   ground_alt=150.0, yaw=0.0, pitch_down=15.0)
         self.assertIn('leave it alone', out)
+
+    def test_the_records_field_of_view_beats_the_table(self):
+        # The mistake this exists to catch: SENSORS claims one field of view,
+        # the aircraft flew with another. Measuring against the claim scales
+        # the answer by exactly the disagreement, and the output looks
+        # perfectly reasonable, so the records have to win.
+        config = {'hfov': 66.0, 'vfov': 49.0}        # what the aircraft used
+        real = {'hfov': 66.0, 'vfov': 52.3, 'yaw': 0.0, 'pitch_down': 15.0}
+        rows = synth(real, count=16, agl=85.0, off_az=22.0, depression=28.0,
+                     config=config)
+        records, log = write_pair(rows, self.dir)
+        saved = dict(swarm.SENSORS['cruza'])
+        try:
+            swarm.SENSORS['cruza']['vfov'] = 52.0    # an aspiration, not a config
+            out = run(calibrate.fov, records=records, log=log, cls='person',
+                      ground_alt=150.0, yaw=0.0, pitch_down=15.0)
+        finally:
+            swarm.SENSORS['cruza'] = saved
+        self.assertIn('Correct SENSORS to match the aircraft', out)
+        self.assertIn('vfov: configured 49.0 deg -> measured 52.3 deg', out)
+        # Measured against the 52.0 table it would have come out near 55.5.
+        self.assertNotIn('measured 55.', out)
+
+    def test_records_without_a_field_of_view_say_so(self):
+        # A capture from before observe.py stamped the field: fall back to
+        # SENSORS, but never quietly.
+        model = swarm.sensor('cruza')
+        config = {'hfov': model['hfov'], 'vfov': model['vfov']}
+        real = {'hfov': config['hfov']*1.2, 'vfov': config['vfov']*1.2,
+                'yaw': 0.0, 'pitch_down': 15.0}
+        rows = synth(real, count=16, agl=85.0, off_az=22.0, depression=28.0,
+                     config=config, stamp=False)
+        records, log = write_pair(rows, self.dir)
+        out = run(calibrate.fov, records=records, log=log, cls='person',
+                  ground_alt=150.0, yaw=0.0, pitch_down=15.0)
+        self.assertIn('do not say what field of view produced them', out)
+        self.assertIn(f'vfov: configured {config["vfov"]:.1f} deg', out)
+
+    def test_a_capture_mixing_two_fields_of_view_is_refused(self):
+        # One scale factor cannot describe two lenses; better to stop than to
+        # average them into a number nobody can trace.
+        config = {'hfov': 66.0, 'vfov': 49.0}
+        real = {'hfov': 66.0, 'vfov': 52.3, 'yaw': 0.0, 'pitch_down': 15.0}
+        rows = synth(real, count=16, agl=85.0, off_az=22.0, depression=28.0,
+                     config=config)
+        rows[-1][0]['fov'] = [66.0, 52.3]
+        records, log = write_pair(rows, self.dir)
+        with self.assertRaises(SystemExit) as caught:
+            run(calibrate.fov, records=records, log=log, cls='person',
+                ground_alt=150.0, yaw=0.0, pitch_down=15.0)
+        self.assertIn('split the file', str(caught.exception))
+
+    def test_tape_mode_recovers_a_vertical_field_of_view(self):
+        # The case the field procedure actually needs: nobody measures a lens
+        # from the air. Camera on the ladder, marker out and off to one side,
+        # a real 52.3 deg lens reported through a 49.0 config.
+        real = {'hfov': 66.0, 'vfov': 52.3}
+        config = {'hfov': 66.0, 'vfov': 49.0}
+        mount = {'yaw': 0.0, 'pitch_down': 25.0}
+        height, distance, offset, box = 2.60, 5.50, 0.90, 0.87
+        ground_range = math.hypot(distance, offset)
+        depression = math.degrees(math.atan2(height-box, ground_range))
+        az_true = math.degrees(math.atan2(offset, distance))-mount['yaw']
+        el_true = mount['pitch_down']-depression
+        rows = []
+        for i in range(12):
+            rows.append({'t': 1793000000.0+i, 'cls': 'person', 'score': 0.9,
+                         'az_rel_deg': round(az_true*config['hfov']/real['hfov'], 2),
+                         'el_rel_deg': round(el_true*config['vfov']/real['vfov'], 2),
+                         'fov': [config['hfov'], config['vfov']],
+                         'bbox': [0.4, 0.4, 0.1, 0.1]})
+        records = Path(self.dir)/'tape.jsonl'
+        records.write_text(''.join(json.dumps(r)+'\n' for r in rows),
+                           encoding='utf-8')
+        out = run(calibrate.fov, records=str(records), cls='person',
+                  yaw=mount['yaw'], pitch_down=mount['pitch_down'],
+                  height=height, distance=distance, offset=offset,
+                  target_height=box)
+        self.assertIn('Tape geometry', out)
+        self.assertIn('vfov: configured 49.0 deg -> measured 52.3 deg', out)
+        self.assertIn('hfov: configured 66.0 deg -> measured 66.0 deg', out)
+        self.assertIn('leave it alone', out)   # hfov was already right
+
+    def test_tape_mode_needs_both_tape_numbers(self):
+        records = Path(self.dir)/'half.jsonl'
+        records.write_text(json.dumps(
+            {'t': 1.0, 'cls': 'person', 'score': 0.9, 'az_rel_deg': 10.0,
+             'el_rel_deg': 8.0, 'bbox': [0.4, 0.4, 0.1, 0.1]})+'\n',
+            encoding='utf-8')
+        with self.assertRaises(SystemExit) as caught:
+            run(calibrate.fov, records=str(records), cls='person',
+                height=2.6, pitch_down=25.0)
+        self.assertIn('both --height and --distance', str(caught.exception))
+
+    def test_a_half_given_aircraft_state_is_refused_not_crashed(self):
+        # --lat/--lon but no --log and no --heading used to reach
+        # `args.heading % 360` and raise TypeError at the user.
+        records = Path(self.dir)/'bare.jsonl'
+        records.write_text(json.dumps(
+            {'t': 1.0, 'cls': 'person', 'score': 0.9, 'az_rel_deg': 10.0,
+             'el_rel_deg': 8.0, 'bbox': [0.4, 0.4, 0.1, 0.1]})+'\n',
+            encoding='utf-8')
+        with self.assertRaises(SystemExit) as caught:
+            run(calibrate.fov, records=str(records), cls='person',
+                pitch_down=25.0)
+        message = str(caught.exception)
+        self.assertIn('--heading', message)
+        self.assertIn('tape geometry', message)
+
+    def test_no_truth_point_and_no_tape_is_refused(self):
+        records = Path(self.dir)/'notruth.jsonl'
+        records.write_text(json.dumps(
+            {'t': 1.0, 'cls': 'person', 'score': 0.9, 'az_rel_deg': 10.0,
+             'el_rel_deg': 8.0, 'bbox': [0.4, 0.4, 0.1, 0.1]})+'\n',
+            encoding='utf-8')
+        with self.assertRaises(SystemExit) as caught:
+            run(calibrate.fov, records=str(records), cls='person',
+                lat=None, lon=None, pitch_down=25.0)
+        self.assertIn('truth point', str(caught.exception))
 
     def test_centred_data_cannot_measure_a_field_of_view(self):
         real = {'hfov': 66.0, 'vfov': 49.0, 'yaw': 0.0, 'pitch_down': 15.0}

@@ -17,6 +17,23 @@ import swarmtest
 from observations import ObservationStore
 
 FIELD = (33.7235577, -85.9070862)
+COMPANION_CONFIG = HERE.parent/'companion'/'config.example.json'
+
+
+class SensorTableTests(unittest.TestCase):
+    """SENSORS' field of view mirrors the aircraft. It is not an aspiration."""
+
+    def test_cruza_field_of_view_matches_the_companion_config(self):
+        # observe.py turns a box centre into an angle using its CONFIGURED
+        # field of view, and calibrate recovers the real lens as
+        # configured x measured-ratio. A SENSORS entry that disagrees with the
+        # Pi therefore corrupts the measurement by exactly the disagreement -
+        # which is how a 52 deg datasheet figure, copied in here while the
+        # aircraft ran 49, would have inflated its own correction by 6 per
+        # cent. Change both together, and only to something measured.
+        observe = json.loads(COMPANION_CONFIG.read_text(encoding='utf-8'))['observe']
+        self.assertAlmostEqual(swarm.SENSORS['cruza']['hfov'], observe['hfov_deg'])
+        self.assertAlmostEqual(swarm.SENSORS['cruza']['vfov'], observe['vfov_deg'])
 
 
 def state(name, lat=FIELD[0], lon=FIELD[1], agl=100.0, heading=0.0, pitch=0.0,

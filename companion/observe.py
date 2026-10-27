@@ -90,9 +90,14 @@ class Publisher:
         az = (cx - 0.5) * hfov
         el = (0.5 - cy) * vfov
         self.seq += 1
+        # Carry the field of view that produced those angles. A calibration run
+        # measures the real lens as configured x ratio, so it has to know what
+        # this aircraft was configured with - and a table kept on the ground is
+        # a guess about that, not a record of it.
         record = {"t": round(time.time(), 2), "seq": self.seq,
                   "cls": cls, "score": round(float(score), 3),
                   "az_rel_deg": round(az, 2), "el_rel_deg": round(el, 2),
+                  "fov": [round(float(hfov), 2), round(float(vfov), 2)],
                   "bbox": [round(float(v), 4) for v in bbox]}
         data = json.dumps(record, allow_nan=False).encode()
         if len(data) > 512:

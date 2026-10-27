@@ -438,6 +438,71 @@ def solve(args):
     return 0
 
 
+def tape_angles(model, height, distance, offset, pitch, target_height):
+    """Where the marker truly sits off boresight, from the tape alone.
+
+    The same geometry as tape_estimate, turned around: there the reported
+    angles were evidence for an unknown mount, here the mount is known and the
+    reported angles are what we are grading. Returns (az_true, el_true) in
+    degrees off boresight, one fixed pair for a static setup.
+    """
+    if distance <= 0:
+        raise SystemExit('--distance must be positive.')
+    if height <= MIN_CAMERA_HEIGHT_M:
+        raise SystemExit(f'--height must be more than {MIN_CAMERA_HEIGHT_M} m; '
+                         f'below that the geometry is all noise.')
+    effective = height-target_height
+    if effective <= 0:
+        raise SystemExit(f'--target-height {target_height} m is at or above the '
+                         f'camera at {height} m, so there is no look-down angle.')
+    ground_range = math.hypot(distance, offset)
+    depression = math.degrees(math.atan2(effective, ground_range))
+    if not swarm.MIN_DEPRESSION_DEG <= depression <= swarm.MAX_DEPRESSION_DEG:
+        raise SystemExit(f'Depression {depression:.1f} deg is outside the usable '
+                         f'band; move the marker.')
+    return (wrap180(math.degrees(math.atan2(offset, distance))-model['yaw']),
+            model['pitch_down']-pitch-depression)
+
+
+def configured_fov(records, model):
+    """The field of view the aircraft actually used to produce these angles.
+
+    observe.py reports el_rel_deg = (0.5 - cy) * vfov_deg, so a field-of-view
+    measurement is only ever a correction to the number the aircraft was
+    configured with. Get that number wrong and the measurement is wrong by the
+    same ratio, while looking perfectly plausible. Records carry it; SENSORS
+    only claims it, so prefer the records and say so when they disagree.
+    """
+    seen = set()
+    for record in records:
+        pair = record.get('fov')
+        if (isinstance(pair, (list, tuple)) and len(pair) == 2
+                and all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                        and v > 0 for v in pair)):
+            seen.add((float(pair[0]), float(pair[1])))
+    if not seen:
+        return dict(model), (
+            'These records do not say what field of view produced them, so the '
+            'configured values below come from SENSORS. If the aircraft was set '
+            'to anything else, the measurement is wrong by that ratio. Re-capture '
+            'with a current observe.py to remove the guess.')
+    if len(seen) > 1:
+        raise SystemExit(
+            'This capture mixes records taken with different fields of view ('
+            + ', '.join(f'{h:g}x{v:g}' for h, v in sorted(seen))
+            + '). Each needs measuring against its own, so split the file.')
+    hfov, vfov = seen.pop()
+    out = dict(model)
+    out['hfov'], out['vfov'] = hfov, vfov
+    note = None
+    if abs(hfov-model['hfov']) > 0.05 or abs(vfov-model['vfov']) > 0.05:
+        note = (f'Records were captured at {hfov:g} x {vfov:g} deg but SENSORS '
+                f'says {model["hfov"]:g} x {model["vfov"]:g}. Measuring against '
+                f'the records, which is what the aircraft used. Correct SENSORS '
+                f'to match the aircraft.')
+    return out, note
+
+
 def fov(args):
     """Field of view from observations the mount angles cannot explain.
 
@@ -449,18 +514,61 @@ def fov(args):
         hfov_true = hfov_assumed * az_true / az_reported
 
     Samples near the centre carry no information and are skipped.
+
+    Works from a flight (--log, or a static aircraft position) or from a TAPE
+    geometry (--height/--distance/--offset), which is how anyone measures this
+    before the airframe flies: over a five-metre baseline a tape is good to
+    centimetres where a handheld GPS fix is good to metres.
     """
-    truth = {'lat': args.lat, 'lon': args.lon}
     records = load_records(args.records, args.cls, args.min_score)
     model = dict(swarm.sensor(args.source))
     if args.yaw is not None:
         model['yaw'] = args.yaw
     if args.pitch_down is not None:
         model['pitch_down'] = args.pitch_down
-    states = log_states(args.log, args.ground_alt) if args.log else None
+    model, fov_note = configured_fov(records, model)
+
+    tape = args.height is not None or args.distance is not None
+    truth, states, fixed = None, None, None
+    if tape:
+        if args.height is None or args.distance is None:
+            raise SystemExit('Tape mode needs both --height and --distance.')
+        fixed = tape_angles(model, args.height, args.distance, args.offset,
+                            args.pitch, args.target_height)
+    else:
+        if args.lat is None or args.lon is None:
+            raise SystemExit('Give a truth point (--lat/--lon) or a tape '
+                             'geometry (--height/--distance).')
+        truth = {'lat': args.lat, 'lon': args.lon}
+        states = log_states(args.log, args.ground_alt) if args.log else None
+        if states is None:
+            # Without this a missing --heading reached `args.heading % 360`
+            # and came back as a TypeError, which tells nobody anything.
+            missing = [name for name, value in
+                       (('--aircraft-lat', args.aircraft_lat),
+                        ('--aircraft-lon', args.aircraft_lon),
+                        ('--agl', args.agl), ('--heading', args.heading))
+                       if value is None]
+            if missing:
+                raise SystemExit(
+                    'Without --log the aircraft state has to be given in '
+                    'full; missing ' + ', '.join(missing) + '. For a camera '
+                    'on a ladder or a tripod use the tape geometry '
+                    '(--height/--distance) instead.')
 
     h_ratios, v_ratios, skipped, matched = [], [], 0, 0
     for record in records:
+        if tape:
+            matched += 1
+            az_true, el_true = fixed
+            az_rep, el_rep = record['az_rel_deg'], record['el_rel_deg']
+            if abs(az_rep) >= model['hfov']*EDGE_FRACTION/2 and abs(az_rep) > 1:
+                h_ratios.append(az_true/az_rep)
+            else:
+                skipped += 1
+            if abs(el_rep) >= model['vfov']*EDGE_FRACTION/2 and abs(el_rep) > 1:
+                v_ratios.append(el_true/el_rep)
+            continue
         if states is not None:
             state = nearest_state(states, record.get('t', 0), args.tolerance)
             if state is None:
@@ -492,7 +600,14 @@ def fov(args):
 
     print(f'\nSource: {args.source}  (assuming yaw {model["yaw"]:+.2f}, '
           f'pitch_down {model["pitch_down"]:.2f})')
+    if tape:
+        print(f'Tape geometry: camera {args.height:.2f} m up, marker '
+              f'{args.distance:.2f} m out, {args.offset:+.2f} m right, box '
+              f'centre {args.target_height:.2f} m up '
+              f'-> truly {fixed[0]:+.2f} az, {fixed[1]:+.2f} el off boresight')
     print(f'Records: {len(records)} read, {matched} matched to a usable geometry')
+    if fov_note:
+        print(f'\n  ! {fov_note}')
     if not h_ratios and not v_ratios:
         if not matched:
             raise SystemExit(
@@ -501,9 +616,11 @@ def fov(args):
                 'point (see --ground-alt).')
         raise SystemExit(
             f'No sample was far enough off centre to measure a field of view '
-            f'({skipped} too central). Fly or point so the target sits out '
-            f'towards the frame edge, past about '
-            f'{model["hfov"]*EDGE_FRACTION/2:.0f} deg off boresight.')
+            f'({skipped} too central). Put the target out towards the frame '
+            f'edge: past {model["hfov"]*EDGE_FRACTION/2:.1f} deg horizontally '
+            f'for hfov, {model["vfov"]*EDGE_FRACTION/2:.1f} deg vertically for '
+            f'vfov. On a tape setup that is a sideways offset and a longer '
+            f'distance; run `check` to find them before you build it.')
     for axis, ratios, key in (('hfov', h_ratios, 'hfov'), ('vfov', v_ratios, 'vfov')):
         if not ratios:
             print(f'  {axis}: no off-centre samples on this axis')
@@ -664,6 +781,13 @@ def main():
     add_geometry(f)
     f.add_argument('--yaw', type=float, help='known mount yaw, from solve')
     f.add_argument('--pitch-down', type=float, help='known mount pitch, from solve')
+    f.add_argument('--height', type=float,
+                   help='TAPE geometry: lens centre above the ground, metres')
+    f.add_argument('--distance', type=float,
+                   help='TAPE geometry: horizontal lens-to-marker along the nose')
+    f.add_argument('--offset', type=float, default=0.0,
+                   help='TAPE geometry: marker offset to the right, metres. '
+                        'Needed for hfov; vfov comes from the distance')
     f.set_defaults(func=fov)
 
     c = sub.add_parser('check', help='plan a ground setup before building it')

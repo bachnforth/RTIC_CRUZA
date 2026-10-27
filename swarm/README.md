@@ -85,11 +85,12 @@ the look-down the more a tilt error stretches it.
 
 **These figures were themselves corrected on 27 Oct.** `SENSORS` carried 15° for
 the Cruza until the nose sled design was checked: the AI Camera sits in the chin
-at **25° down** with a **52° vertical view**. At the 20 Oct geometry that mistake
-put a centred cue **348 m** beyond the truth — nearly three times the fusion
-radius, so the Cruza would never have correlated with a quad. The steeper real
-mount also shortens the working range from 657 m to 309 m, which is why every
-number above is smaller than it used to be.
+at **25° down**. At the 20 Oct geometry that mistake put a centred cue **348 m**
+beyond the truth — nearly three times the fusion radius, so the Cruza would
+never have correlated with a quad. The steeper real mount also shortens the
+working range from 657 m to 309 m, which is why every number above is smaller
+than it used to be. 25° is still only the design's intent for the printed nose;
+the ground procedure is what turns it into a measurement.
 
 The operational reading is the concept of employment the fleet already assumed:
 **the Cruza's cue is a direction to go look, not a location.** The close-in
@@ -100,8 +101,12 @@ So, before trusting a cross-cue in the field:
 
 1. Measure `pitch_down` and `yaw` on each airframe and set them in
    `swarm.SENSORS`. One degree of pitch is worth more than five of heading.
-2. Check `hfov_deg` / `vfov_deg` against the actual lens, in the Pi's
-   `observe` config block. The harness assumes the configured value is true.
+2. **Measure** `hfov_deg` / `vfov_deg` with `calibrate.py fov`; do not copy a
+   datasheet figure in. The aircraft reports angles in units of its configured
+   field of view, so the measurement is a correction *to* that value — a
+   configured number that was itself a guess scales the answer by the same
+   error. Set the Pi's `observe` config and `swarm.SENSORS` to the measurement
+   together; a test fails if they drift apart.
 3. Re-run `bench` after changing either; the sensitivity rows will show it.
 
 **[CALIBRATION.md](CALIBRATION.md) is the field procedure for all of that** — the

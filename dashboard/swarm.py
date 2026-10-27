@@ -25,28 +25,41 @@ every point as a starting place to look, and re-pick it on the map.
 """
 import math
 
-# Per-aircraft camera model. Field of view must match the Pi observer config
-# (observe.hfov_deg / observe.vfov_deg); the mount angles must be measured on
-# the airframe. yaw 0 = camera along the nose, positive to the right.
+# Per-aircraft camera model. The two halves of this table are different kinds
+# of number and must be treated differently.
+#
+# hfov / vfov MIRROR THE PI OBSERVER CONFIG (observe.hfov_deg / vfov_deg). They
+# are not a claim about the lens. observe.py reports an angle, not a pixel:
+# el_rel_deg = (0.5 - cy) * vfov_deg, so every reported angle is already
+# denominated in the configured field of view. `calibrate.py fov` recovers the
+# real lens as configured x measured-ratio, which is only right if the value
+# here is the value the aircraft used. Putting an aspiration here - a datasheet
+# figure, a CAD note - silently scales the measurement by the same error it was
+# meant to find. Change these only to match the aircraft, and change the
+# aircraft only to a measurement.
+#
+# yaw / pitch_down are measured on the airframe and live only here; nothing on
+# the Pi uses them. yaw 0 = camera along the nose, positive to the right.
 # pitch_down = boresight tilted this far below level in level flight.
 #
-# cruza: from the nose sled design - the AI Camera sits in the chin aimed 25 deg
-# down, with a 52 deg vertical view running from about level with the horizon to
-# 51 deg below. These are design intent, not a measurement of the printed and
-# assembled nose, so they are a starting point for calibration rather than the
-# end of it. They replace an earlier 15 deg / 49 deg guess that was wrong enough
-# to matter: at the 20 Oct flight geometry (109 m AGL, 5.6 deg nose-up) a centred
-# cue resolved with 15 deg lands about 350 m beyond the truth, because a
-# shallower assumed look-down stretches the range. That is nearly three times the
-# fusion radius, so the Cruza would never have correlated with a quad.
+# cruza pitch_down 25 is from the nose sled design - the AI Camera sits in the
+# chin aimed 25 deg down. Design intent for the printed nose, not a measurement
+# of the assembled one, so it is where calibration starts rather than where it
+# ends. It replaces an earlier 15 deg guess that was wrong enough to matter: at
+# the 20 Oct flight geometry (109 m AGL, 5.6 deg nose-up) a centred cue resolved
+# with 15 deg lands about 350 m beyond the truth, because a shallower assumed
+# look-down stretches the range. That is nearly three times the fusion radius,
+# so the Cruza would never have correlated with a quad.
 #
-# NOTE the Pi's own observe config still says vfov_deg 49.0, and that is what
-# computes the reported angles, so it under-reports the vertical by about 6 per
-# cent until it is changed on the aircraft to match the lens.
+# The sled drawing also captions a 52 deg vertical view, and the AI Camera's
+# published figure is about 52.3, against the 49.0 configured on the aircraft.
+# That is NOT settled by copying 52 in here - see above. Phase 2 of
+# swarm/CALIBRATION.md measures it; whatever it measures goes on the Pi and
+# here, together.
 #
 # quadpi and rn03 remain placeholders - nobody has measured them.
 SENSORS = {
-    'cruza':  {'hfov': 66.0, 'vfov': 52.0, 'yaw': 0.0, 'pitch_down': 25.0},
+    'cruza':  {'hfov': 66.0, 'vfov': 49.0, 'yaw': 0.0, 'pitch_down': 25.0},
     'quadpi': {'hfov': 66.0, 'vfov': 49.0, 'yaw': 0.0, 'pitch_down': 30.0},
     'rn03':   {'hfov': 90.0, 'vfov': 60.0, 'yaw': 0.0, 'pitch_down': 25.0},
 }

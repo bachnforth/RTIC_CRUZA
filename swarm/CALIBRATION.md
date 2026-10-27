@@ -25,21 +25,48 @@ radius, so the platforms would agree, just less precisely.
 
 **This already bit us.** `swarm.SENSORS` carried 15° for the Cruza until the nose
 sled design was checked on 27 Oct, which puts the AI Camera in the chin at **25°
-down** with a **52° vertical view**. At the 20 Oct flight geometry (109 m AGL,
-5.6° nose-up) a centred cue resolved with 15° lands about **350 m beyond** the
-truth, because a shallower assumed look-down stretches the range. That is nearly
-three times the fusion radius — the Cruza would never have correlated with a
-quad. SENSORS now carries the design figures, but they are design intent for the
-printed nose, not a measurement of the assembled one, which is what the rest of
-this document is for.
+down**. At the 20 Oct flight geometry (109 m AGL, 5.6° nose-up) a centred cue
+resolved with 15° lands about **350 m beyond** the truth, because a shallower
+assumed look-down stretches the range. That is nearly three times the fusion
+radius — the Cruza would never have correlated with a quad. SENSORS now carries
+25, but that is design intent for the printed nose, not a measurement of the
+assembled one, which is what the rest of this document is for.
 
-**A second discrepancy to settle while calibrating:** the design says the AI
-Camera has a **52°** vertical view (the Raspberry Pi AI Camera's published figure
-is about 52.3°), but the Pi's `observe` config still says `vfov_deg: 49.0`. That
-config value is what computes the reported angles, so until it is changed on the
-aircraft every vertical angle is under-reported by roughly 6 per cent, about
-0.6° at 10° off boresight. `swarm.SENSORS` has been set to 52; the aircraft has
-not. Phase 2 measures it — make the two agree.
+### The field of view is measured, never copied
+
+The sled drawing captions a **52°** vertical view and the Raspberry Pi AI
+Camera's published figure is about 52.3°, against the **49.0** configured on the
+aircraft. Do not resolve that by typing 52 anywhere. **Phase 2 measures it, and
+whatever it measures is what goes in.**
+
+This is not pedantry, it is how the measurement works. `observe.py` reports an
+angle, not a pixel:
+
+```
+el_rel_deg = (0.5 - cy) * vfov_deg
+```
+
+so every angle the aircraft reports is already denominated in its *configured*
+field of view, and `calibrate.py fov` recovers the real lens as
+`configured x measured-ratio`. Put an aspiration in the configured slot and the
+answer is scaled by the very error you were trying to find — setting
+`SENSORS` to 52 while the aircraft ran 49 would have made a true 52.3° lens
+measure as **55.5°**, and nothing in the output would have looked wrong.
+
+So:
+
+- `SENSORS` holds what the aircraft is **configured** with, currently 49.0. It
+  is a mirror of `observe.hfov_deg` / `vfov_deg`, not a claim about the lens.
+  `swarm/test_swarm.py` fails if the two drift apart.
+- Records now carry their own `"fov": [hfov, vfov]`, so a capture says what
+  produced its angles and `fov` measures against that rather than against the
+  table. Captures taken before this say so in the output.
+- When phase 2 gives a number, change the Pi's `observe` config **and**
+  `SENSORS` to it together, then re-run `solve` — the two measurements are
+  coupled.
+
+Until then the Cruza's vertical angles are off by whatever 49.0 is wrong by,
+roughly 0.6° at 10° off boresight if the lens really is 52.3°.
 
 Everything below is ordered by what buys the most accuracy per minute spent.
 
@@ -106,11 +133,10 @@ to be meaningfully above the target's torso:
 | 3.2 m | 2.33 m | 5.0 m | 4.0 m | 5.0 m |
 
 A table at 1.2 m puts the marker well under a metre from the lens, which is
-useless. **Use the ladder.** The Cruza column now comes from the nose sled
-design — AI Camera in the chin, 25 deg down, 52 deg vertical view — so it is a
-real starting point rather than a guess; quadpi and rn03 are still placeholders.
-Either way, walk the marker in or out until the detection sits near the middle
-of the frame.
+useless. **Use the ladder.** The Cruza column comes from the nose sled design's
+25 deg mount, so it is a real starting point rather than a guess; quadpi and
+rn03 are still placeholders. Either way, walk the marker in or out until the
+detection sits near the middle of the frame.
 
 **The centred window is narrower than you might expect.** At 2.6 m with the
 Cruza's 25 deg mount, `solve` accepts only samples between about **2.7 m and
@@ -220,25 +246,55 @@ feeding the tap.
 python swarm/swarmtest.py bench --log logs/2026-10-20/download-162053_202463/log_00030.records.json --out swarm/bench-after-calibration.json
 ```
 
-## Phase 2 — field of view (~15 min, only if the lens is unknown)
+## Phase 2 — field of view (~15 min, do it, do not skip it)
 
-Skip this if the camera's specified field of view is documented and you trust it;
-the mount angles matter far more. If you do not know it, a wrong field of view
-scales every reported angle and will quietly corrupt everything.
+**Do not skip this because the lens is "documented".** The Cruza's is documented
+twice, at 49.0 and at 52.3, and the number the aircraft is configured with is
+the one every reported angle is denominated in. Measure it. Whatever comes out
+is what goes on the Pi and in `SENSORS`; nothing gets typed in from a drawing.
 
-Same setup, but **move the marker well off to one side** — past about 8° off
-boresight, which at the Cruza's 3.7 m is roughly **0.55 m sideways**. Capture,
-then:
+Phase 1 put the marker at the boresight, where a field of view leaves no trace.
+This phase deliberately puts it **off centre on both axes at once** — further
+out, so it rides high in the frame, and off to the side. `fov` needs a sample
+past a quarter of the way to each edge:
+
+| | threshold off boresight | why |
+|---|---|---|
+| hfov | 8.2° | `hfov x EDGE_FRACTION / 2` |
+| vfov | 6.1° | `vfov x EDGE_FRACTION / 2` |
+
+**From the 2.6 m ladder, put the marker 5.5 m out and 1.0 m to the right.** That
+is +10.3° azimuth and +7.8° elevation off boresight, clearing both thresholds
+with enough margin that a lens up to about 10% wider than configured still
+reports inside them.
+
+> The geometry this file recommended before 27 Oct — 3.7 m out, 0.55 m across —
+> measured **neither** axis. At 3.7 m the marker sits on the boresight by
+> construction, so the vertical sample is 0.2°, and 0.55 m across is 8.5° true
+> but reports as 7.8° through a wider lens, under the horizontal threshold too.
+> `fov` now says so and names both thresholds instead of only the horizontal one.
+
+Sight the nose at a point 1.0 m left of the marker so the yaw from phase 1 still
+applies, capture 10-20 detections, then:
 
 ```bash
 python swarm/calibrate.py fov --source cruza --records cal-cruza-edge.jsonl \
-  --height 2.60 --distance 3.70 --offset 0.55 --target-height 0.87 \
+  --cls person --height 2.60 --distance 5.50 --offset 1.00 --target-height 0.87 \
   --yaw <from phase 1> --pitch-down <from phase 1>
 ```
 
-Within 2% of the configured value, leave it alone. If you change it, **re-run
-phase 1** — the two measurements are coupled, because the mount solve reads
-angles the field of view scales.
+It prints the truth angles it derived from your tape, then each axis as
+`configured -> measured`. Within 2% of the configured value, leave it alone.
+
+**When you change a field of view, change it in two places and re-run phase 1.**
+The Pi's `observe` config block (`hfov_deg` / `vfov_deg`) is what computes the
+angles; `swarm.SENSORS` must mirror it, and `swarm/test_swarm.py` fails if the
+two drift apart. Then re-run the mount solve — it reads angles the field of
+view scales, so the two measurements are coupled.
+
+Records captured by a current `observe.py` carry their own `"fov": [h, v]`, and
+`fov` measures against that rather than against `SENSORS`. If your capture
+predates that, the output says so; believe it less.
 
 ---
 
@@ -298,6 +354,8 @@ python swarm/calibrate.py solve --source cruza --records cal-flight.jsonl \
 | Quad geolocation vs truth | within 15 m at ≤100 m | the map |
 | Two platforms on one object | `span_m` under 50 m | the AOI row's "N m apart" |
 | Two objects 500 m apart | two separate tracks | the AOI panel |
+| Field of view measured, not assumed | both axes reported | `fov` output |
+| Pi config and `SENSORS` agree | test passes | `python swarm/test_swarm.py` |
 | Bench after calibration | 12/12 | `swarmtest.py bench` |
 
 `span_m` is the honest live check and needs no post-processing: if two aircraft
