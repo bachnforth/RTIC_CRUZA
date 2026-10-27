@@ -106,9 +106,31 @@ Expect `695441dd305a71c63d8c8d4701f3c11891ca5c120d09f6bf5b88c31eb0cc7035`.
 ## Next step is camera calibration — and it is gated
 
 Calibration is the right next move: mount pitch is the dominant error term, worth
-**65 m at the Cruza's 660 m slant range per degree**, and 5° puts the point 235 m
-out, further than the fusion radius. The procedure, tooling and tests are all
-ready in [`swarm/CALIBRATION.md`](../swarm/CALIBRATION.md) and `swarm/calibrate.py`.
+about **16 m per degree at the Cruza's 309 m working range** — roughly three
+times what a heading error costs, and the one nobody notices, because a mis-set
+mount is silently consistent. The procedure, tooling and tests are all ready in
+[`swarm/CALIBRATION.md`](../swarm/CALIBRATION.md) and `swarm/calibrate.py`.
+
+**An earlier version of this document quoted 65 m per degree at 660 m. That was
+wrong, and the reason matters.** `swarm.SENSORS` carried 15° of camera
+mount-down for the Cruza until the nose sled design was checked: the AI Camera
+sits in the chin at **25° down** with a **52° vertical view**, horizon to 51°
+below. At the 20 Oct flight geometry a centred cue resolved with 15° lands
+**348 m** beyond the truth, because a shallower assumed look-down stretches
+`altitude / tan(depression)`. That is nearly three times the 120 m fusion radius
+— the Cruza would never have correlated with a quad, and it would have looked
+like the quads were wrong. Corrected in #3, with every table re-derived and the
+bench re-run. The steeper real mount also shortens the working range from 657 m
+to 309 m, which is why the per-degree cost is now lower than previously stated.
+
+These are design intent for the printed nose, not a measurement of the assembled
+one — which is exactly what calibration is for.
+
+**One more mismatch to settle on the aircraft:** the design says the AI Camera
+has a 52° vertical view, but the Pi's `observe` config still says
+`vfov_deg: 49.0`, and that config value is what computes the reported angles. So
+the aircraft under-reports vertical angles by about 6 per cent until it is
+changed. `swarm.SENSORS` is now 52; the Pi is not.
 
 **But it cannot start today on any platform**, which is worth being plain about:
 
