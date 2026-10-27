@@ -114,8 +114,8 @@ mount is silently consistent. The procedure, tooling and tests are all ready in
 **An earlier version of this document quoted 65 m per degree at 660 m. That was
 wrong, and the reason matters.** `swarm.SENSORS` carried 15° of camera
 mount-down for the Cruza until the nose sled design was checked: the AI Camera
-sits in the chin at **25° down** with a **52° vertical view**, horizon to 51°
-below. At the 20 Oct flight geometry a centred cue resolved with 15° lands
+sits in the chin at **25° down**. At the 20 Oct flight geometry a centred cue
+resolved with 15° lands
 **348 m** beyond the truth, because a shallower assumed look-down stretches
 `altitude / tan(depression)`. That is nearly three times the 120 m fusion radius
 — the Cruza would never have correlated with a quad, and it would have looked
@@ -126,11 +126,24 @@ to 309 m, which is why the per-degree cost is now lower than previously stated.
 These are design intent for the printed nose, not a measurement of the assembled
 one — which is exactly what calibration is for.
 
-**One more mismatch to settle on the aircraft:** the design says the AI Camera
-has a 52° vertical view, but the Pi's `observe` config still says
-`vfov_deg: 49.0`, and that config value is what computes the reported angles. So
-the aircraft under-reports vertical angles by about 6 per cent until it is
-changed. `swarm.SENSORS` is now 52; the Pi is not.
+**The field of view is a measurement, and nothing has measured it.** The sled
+drawing captions 52°, the AI Camera's published figure is about 52.3°, and the
+Pi's `observe` config says `vfov_deg: 49.0`. The temptation is to settle that by
+typing 52 into `swarm.SENSORS`, and #3 briefly did. That is worse than leaving it
+alone, because `observe.py` reports `el_rel_deg = (0.5 - cy) * vfov_deg` — every
+angle the aircraft sends is already denominated in the *configured* field of
+view, and `calibrate.py fov` recovers the real lens as `configured x ratio`. Set
+`SENSORS` to 52 while the aircraft runs 49 and a true 52.3° lens measures as
+**55.5°**, with nothing in the output looking wrong.
+
+So `SENSORS` is back to 49.0, mirroring the aircraft, and a test fails if the two
+drift apart. Records now carry their own `"fov": [h, v]` so a capture states what
+produced its angles. Phase 2 of the run sheet measures it; whatever it measures
+goes on the Pi and in `SENSORS` together, and then phase 1 is re-run, because the
+mount solve reads angles the field of view scales.
+
+Until then the Cruza's vertical angles are off by whatever 49.0 is wrong by —
+roughly 0.6° at 10° off boresight if the lens really is 52.3°.
 
 **But it cannot start today on any platform**, which is worth being plain about:
 
