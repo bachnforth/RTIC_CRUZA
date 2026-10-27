@@ -1,9 +1,14 @@
 param([string]$PythonPath = (Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'), [switch]$NoOpen,
       # quadpi click-to-fly: the bridge's UDP listen address, e.g. 127.0.0.1:14551 for SITL.
       # Omit to keep the dashboard read-only.
-      [string]$QuadControl)
+      [string]$QuadControl,
+      # quadpi arm/disarm only, through the installed bridge's bench port: a host
+      # reached by SSH tunnel (e.g. 100.100.0.10), or 127.0.0.1:15760 for SITL.
+      [string]$QuadBench)
 $ErrorActionPreference = 'Stop'
+if ($QuadControl -and $QuadBench) { throw 'Use -QuadControl or -QuadBench, not both.' }
 if ($QuadControl) { $env:DASHBOARD_QUAD_CONTROL = $QuadControl } else { Remove-Item Env:DASHBOARD_QUAD_CONTROL -ErrorAction SilentlyContinue }
+if ($QuadBench) { $env:DASHBOARD_QUAD_BENCH = $QuadBench } else { Remove-Item Env:DASHBOARD_QUAD_BENCH -ErrorAction SilentlyContinue }
 $url = 'http://127.0.0.1:8765'
 try { $status = Invoke-RestMethod "$url/status" -TimeoutSec 2 } catch { $status = $null }
 if (-not $status) {

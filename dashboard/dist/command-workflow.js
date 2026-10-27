@@ -29,15 +29,28 @@
   // Whether the aircraft's current state allows a live command right now.
   function blocker(a, link) {
     if (!link?.online) return `No heartbeat from ${names[platform.value]} on the control link.`;
+    if (a.id === 'arm' && link.armed) return 'Already armed.';
+    if (a.id === 'arm' && ![0, 2, 5, 16].includes(link.mode_id)) return `Mode is ${link.mode}: set the Pocket switch to STABILIZE first.`;
     if (a.id === 'arm_takeoff' && link.armed) return 'Already armed. Use Fly to point & hold, Hold, RTL or Land.';
     if (a.id === 'arm_takeoff' && !link.position) return 'No position fix yet; GUIDED takeoff needs GPS.';
     if (a.id === 'goto' && (!link.armed || link.in_air === false)) return 'Take off first.';
+    if (a.id === 'loiter') {
+      const c = live()?.circle;
+      if (!link.armed || link.in_air === false) return 'Take off first.';
+      if (!c?.known) return 'Circle settings not read from the aircraft yet.';
+      if (c.throttle_pwm == null) return 'No Pocket throttle reading.';
+      if (c.throttle_pwm < c.throttle_centre[0] || c.throttle_pwm > c.throttle_centre[1])
+        return `Pocket throttle is ${c.throttle_pwm} µs: centre it first (CIRCLE uses it to climb or sink).`;
+    }
     if (a.id === 'disarm' && link.armed && link.in_air === true) return 'In the air: use Land, not Disarm.';
     if (a.id === 'disarm' && !link.armed) return 'Already disarmed.';
     return '';
   }
+  // point: true (required) or 'optional'; altitude: true or 'with-point'.
+  const usesPoint = a => a?.point === true || (a?.point === 'optional' && !!candidate);
+  const needsAltitude = a => a?.altitude === true || (a?.altitude === 'with-point' && !!candidate);
   function altitudeValue(a) {
-    if (!a?.altitude) return null;
+    if (!needsAltitude(a)) return null;
     const value = Number(altitude.value), max = live()?.max_altitude_m ?? Infinity;
     return altitude.value.trim() !== '' && Number.isFinite(value) && value >= (live() ? 1 : 0) && value > 0 && value <= max ? value : undefined;
   }
@@ -84,21 +97,26 @@
     $('#wf-destination').textContent = candidate ? `Point: ${coordinates(candidate)}` : 'No point selected.';
     $('#wf-clear').disabled = !candidate;
     $('#wf-pick').textContent = candidate ? 'Change point on map' : 'Pick point on map';
-    $('#wf-point-note').textContent = a ? (a.point ? 'This command uses the selected point.' : 'This command ignores the selected point.') : 'You can pick a point before choosing a command.';
+    $('#wf-point-note').textContent = !a ? 'You can pick a point before choosing a command.'
+      : a.point === 'optional' ? (candidate ? 'It will fly to this point and circle it.' : 'Optional: pick a point to circle it; otherwise it circles where it is now.')
+      : a.point ? 'This command uses the selected point.' : 'This command ignores the selected point.';
     const why = isLive && a ? blocker(a, link) : '';
     $('#wf-action-note').textContent = a ? a.text + (why ? ` — ${why}` : '') : 'Select an aircraft, then a command.';
-    $('#wf-altitude-label').hidden = !a?.altitude;
-    $('#wf-altitude-note').textContent = a?.altitude
+    $('#wf-altitude-label').hidden = !needsAltitude(a);
+    $('#wf-altitude-note').textContent = needsAltitude(a)
       ? (isLive ? `Metres above home, 1–${control.max_altitude_m}. Terrain clearance is not checked.` : 'Enter a positive altitude in metres relative to home. No default altitude is assumed; terrain clearance is not evaluated.')
       : '';
-    $('#wf-build').disabled = sending || !platform.value || !a || (a.point && !candidate) || altitudeValue(a) === undefined || !!why;
+    $('#wf-build').disabled = sending || !platform.value || !a || (a.point === true && !candidate) || altitudeValue(a) === undefined || !!why;
     $('#wf-build').textContent = isLive ? '4 · Review command' : '4 · Review preview';
     // One-click row for the live platform.
-    const quick = $('#wf-quick');
-    quick.hidden = !isLive;
-    if (isLive) {
-      quick.querySelectorAll('button').forEach(b => { b.disabled = sending || !!control.busy || !link?.online; });
-    }
+    // Only the immediate commands this link offers (the bench link has none).
+    const quick = $('#wf-quick'), offered = new Set((control?.actions || []).map(x => x.id));
+    quick.hidden = !isLive || !quick.querySelector('button[data-action]') ||
+      ![...quick.querySelectorAll('button[data-action]')].some(b => offered.has(b.dataset.action));
+    quick.querySelectorAll('button[data-action]').forEach(b => {
+      b.hidden = !offered.has(b.dataset.action);
+      b.disabled = sending || !!control?.busy || !link?.online;
+    });
     const log = $('#wf-log');
     log.replaceChildren(...(control?.history || []).slice().reverse().map(e => {
       const li = document.createElement('li');
@@ -110,8 +128,8 @@
   async function send(id) {
     const a = actionsFor(platform.value).find(x => x.id === id), target = platform.value;
     const body = {platform: target, action: id};
-    if (a.altitude) body.altitude_m = altitudeValue(a);
-    if (a.point) Object.assign(body, {latitude: candidate.latitude, longitude: candidate.longitude});
+    if (needsAltitude(a)) body.altitude_m = altitudeValue(a);
+    if (usesPoint(a)) Object.assign(body, {latitude: candidate.latitude, longitude: candidate.longitude});
     sending = true; invalidate(); render();
     result.className = '';
     result.textContent = `Sending ${a.label} to ${names[target]}…`;
@@ -154,9 +172,20 @@
     window.fleetMap.cancelPick();
     const a = action(), isLive = !!live();
     let sentence = `${names[platform.value]} — ${a.label}. `;
-    if (a.point) sentence += `Destination ${coordinates(candidate)}. `;
-    if (a.altitude) sentence += `Altitude ${altitudeValue(a)} m above home. `;
-    if (!a.point && !a.altitude) sentence += 'No map destination is used. ';
+    if (a.id === 'loiter' && isLive) {
+      const c = live().circle;
+      sentence += candidate ? `Fly to ${coordinates(candidate)} at ${altitudeValue(a)} m above home, then circle. `
+        : 'Circle where it is now, at its current altitude. ';
+      sentence += `Aircraft circle: ${c.radius_m} m radius, ${c.direction}, ${Math.abs(c.rate_deg_s)}°/s. `;
+      sentence += c.centred ? 'Centred on that position. '
+        : `CIRCLE_OPTIONS does not start at centre: the circle's centre will be ${c.radius_m} m ahead of the aircraft. `;
+      sentence += 'Keep the Pocket throttle centred. ';
+    } else {
+      if (usesPoint(a)) sentence += `Destination ${coordinates(candidate)}. `;
+      if (needsAltitude(a)) sentence += `Altitude ${altitudeValue(a)} m above home. `;
+      if (!usesPoint(a) && !needsAltitude(a)) sentence += 'No map destination is used. ';
+    }
+    if (a.id === 'arm') sentence += `Current mode: ${live().link?.mode ?? 'unknown'} (set by the Pocket). `;
     sentence += isLive ? 'THIS WILL BE SENT TO THE AIRCRAFT.' : 'PREVIEW ONLY — nothing will be sent to an aircraft.';
     $('#wf-summary').textContent = sentence;
     $('#wf-confirm').textContent = isLive ? `Send to ${names[platform.value]}` : 'Complete preview · no transmission';

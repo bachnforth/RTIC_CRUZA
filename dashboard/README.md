@@ -48,8 +48,9 @@ stays read-only.
 quadpi's live commands in the workflow:
 **Arm & take off** to 1–120 m (switches to GUIDED, arms, takes off),
 **Fly to point & hold** picked on the map at 1–120 m (within 1 km of the quad),
-**Hold** (BRAKE, ignores the Pocket's sticks), **RTL**, **Land here**, and
-**Disarm** on the ground. Each step waits for the
+**Loiter (circle)**, **Hold** (BRAKE, ignores the Pocket's sticks), **RTL**,
+**Land here**, **Arm motors (current mode)** and **Disarm** on the ground.
+Each step waits for the
 aircraft's acknowledgement, is never retried, and shows the refusal reason
 (including recent PreArm text). Every action is appended to the ignored
 `runtime/quad-commands.log`. Cruza stays read-only.
@@ -94,6 +95,37 @@ without a platform. Disarm could not be reviewed while airborne.
 On Windows the bridge needs a listener on its `--udp-target`, otherwise
 Windows' UDP reset behaviour applies; a departed peer no longer crashes it.
 
+### Loiter (circle) (27 October 2026) — SITL-tested only
+
+Loiter flies the FC's own circle: radius `CIRCLE_RADIUS_M` (or `CIRCLE_RADIUS`
+in cm), direction from the sign of `CIRCLE_RATE` (positive = clockwise). The
+dashboard reads these with `PARAM_REQUEST_READ` and never writes them. With no
+map point it switches straight to CIRCLE around where the quad is. With a map
+point (and an altitude) it flies there in GUIDED and switches to CIRCLE once
+within 3 m; any other command, a mode change from the Pocket or QGC, landing,
+or 5 minutes without arriving cancels that pending switch.
+
+- CIRCLE takes climb/descent from the Pocket throttle, so Loiter is refused
+  unless the throttle (`RCMAP_THROTTLE`, from `RC_CHANNELS`) reads 1400–1600 µs.
+- ArduCopter centres the circle one radius *ahead* of the aircraft unless
+  `CIRCLE_OPTIONS` has bit 4 ("start at centre"). The review says which will
+  happen. Setting that bit is a one-time FC change for the owner; quadpi's
+  value has not been read yet.
+- The bridge allowlist gains only DO_SET_MODE CIRCLE (7).
+
+SITL, 27 October (filter + dashboard, a stand-in holding the "Pocket" throttle
+via RC override): takeoff to 10 m; Loiter refused with throttle at 1000 µs;
+with throttle centred and `CIRCLE_OPTIONS`=1, Loiter here flew a 10.0 m circle
+at a steady 10.0 m whose centre was 10.0 m from the entry point (as warned);
+with `CIRCLE_OPTIONS`=5, Loiter at a point 80 m away at 15 m flew there,
+logged "Arrived; circling" and flew a 10.0 m circle at 15.0 m centred 2.3 m
+from the chosen point; RTL landed at home and disarmed; takeoff to 5 m and
+Land landed and disarmed; Arm (STABILIZE) then Disarm both accepted. The
+bridge passed 430 messages to the FC and blocked none. ArduCopter refuses
+GUIDED arming unless the throttle is low ("Throttle (RC3) is not neutral"), so
+the pilot centres it only after takeoff, before Loiter. 52 dashboard tests and
+19 bridge tests pass.
+
 ### Before using it on the real quad (phase 2, props off, then phase 3)
 
 1. Back up the live bridge on quadpi, install the new `safety_mavlink_filter.py`,
@@ -104,6 +136,67 @@ Windows' UDP reset behaviour applies; a departed peer no longer crashes it.
 3. Start with `start-dashboard.ps1 -QuadControl 10.223.79.20:14551`, props off:
    check every button's acknowledgement and refusal, and both failsafes.
 4. First flight: short hover with a safety pilot on the Pocket.
+
+### Bench arm test (props off)
+
+**Arm motors (current mode)** arms in whatever mode the Pocket's switch selects
+(STABILIZE on positions 3/4 needs no GPS): no mode change, no takeoff. The
+review shows the current mode. The FC still runs every pre-arm check and a
+refusal shows its reason; on the ground it disarms itself after
+`DISARM_DELAY` (10 s). SITL, 26 October: armed in STABILIZE with no mode
+change and auto-disarmed about 10 s later; armed then disarmed from the
+workflow; with an impossible `BATT_ARM_VOLT` the panel showed "Arm refused
+(FAILED): Arm: Battery 1 below minimum arming voltage".
+
+1. Props off. Pocket on, throttle low, mode switch on STABILIZE. Power quadpi
+   and the mesh. If the laptop rebooted, run `fix-mesh-routes.ps1` as
+   administrator.
+2. Copy the filter package from the 10 inch Quad project to the Pi:
+   ```powershell
+   $pi = "$HOME\Documents\ChatGPT\10 inch Quad\safety-arbiter\pi"
+   ssh -i $HOME\.ssh\id_ed25519_rpi -o HostKeyAlias=10.223.79.20 ebach@10.223.79.20 'mkdir -p ~/dashboard-filter-install'
+   scp -i $HOME\.ssh\id_ed25519_rpi -o HostKeyAlias=10.223.79.20 "$pi\install-dashboard-filter.sh" "$pi\safety_mavlink_filter.py" "$pi\test_flight_commands.py" "$pi\test_telemetry_startup.py" ebach@10.223.79.20:dashboard-filter-install/
+   ```
+3. On the Pi (`ssh ... ebach@10.223.79.20`):
+   ```sh
+   cd ~/dashboard-filter-install && sed -i 's/\r$//' *.sh *.py && chmod +x install-dashboard-filter.sh
+   ./install-dashboard-filter.sh status
+   sudo ./install-dashboard-filter.sh install --bench
+   ```
+   `status` reports which filter version is live. `install` refuses an unknown
+   version (it prints the diff and the `--accept-live-sha` to use if only the
+   dashboard change differs), runs the tests with the service's own Python,
+   backs up to `/var/backups/quadpi/dashboard-filter-<time>/`, restarts only
+   `safety-mavlink-filter` and restores the backup by itself if the service
+   does not stay up. Undo with `sudo ./install-dashboard-filter.sh rollback --bench`.
+4. On the laptop: `start-dashboard.ps1 -QuadControl 10.223.79.20:14551` (stop
+   the read-only dashboard first). Command workflow → quadpi → Arm motors
+   (current mode) → review → Send. Then Disarm from the workflow, and once
+   more check that the Pocket can disarm.
+
+**What actually ran on 27 October.** quadpi's `safety-mavlink-filter` service
+was found running a different, uncommitted bridge installed on 21 October:
+drop-in `70-dashboard-bench.conf` starts `/opt/quadpi-dashboard-bench/bridge.py`
+with a loopback TCP bench port (15760) that accepts, from GCS 254/190 only,
+on-ground arm/disarm, GUIDED/STABILIZE while disarmed, a few 2 Hz telemetry
+requests and four failsafe parameters. The install script above refuses this
+(its live file is not `safety_mavlink_filter.py`); installing our filter means
+backing up and removing that drop-in first. The owner chose to keep it, so the
+dashboard gained `start-dashboard.ps1 -QuadBench 10.223.79.20`: an SSH tunnel
+to the bench port, GCS ID 254, Arm and Disarm only.
+
+Results: arm and disarm from the workflow were accepted by quadpi (11:13:59 /
+11:14:15 by Claude, 11:17:50 / 11:17:59 by the owner), confirmed by the FC's
+"ARMED"/"Disarmed" messages. Earlier attempts failed: over Tailscale (relayed
+via DERP, ~2 s each way) the FC refused with "PreArm: GCS failsafe on"; on the
+mesh, quadpi at 84.9 °C and throttling (`0x60006`) lost most telemetry even
+with no commands. After cooling (≈62–72 °C, `throttled=0x0`) a 3-minute
+command-free test received 180/180 heartbeats with no gaps. quadpi only joins
+the mesh when RN08's USB link enumerates (LAN9500A as `eth0`, profile `mini`,
+10.223.79.20/16); reseating the cable and power-cycling fixed it. The laptop
+reached the mesh through RN20's Wi-Fi "Carp" on Wi-Fi 2. The FC reported "GPS
+Glitch or Compass error" and "EKF variance" on the bench; check before flight.
+Keep quadpi cooled whenever the camera runs.
 
 ## How to use it
 

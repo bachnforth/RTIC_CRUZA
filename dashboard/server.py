@@ -16,7 +16,7 @@ import subprocess
 import threading
 import time
 from fleet import Limits, VehicleState
-from control import QuadControl, parse_target
+from control import BenchControl, QuadControl, parse_target
 
 # Alert thresholds. Cruza's values copy its own flight-controller settings
 # (BATT_LOW_VOLT 14.0, BATT_CRT_VOLT 13.2, AIRSPEED_MIN 10 in the 2026-10-14
@@ -458,6 +458,11 @@ def main():
         control = controls['quadpi'] = QuadControl(parse_target(os.environ['DASHBOARD_QUAD_CONTROL']),
                               HERE/'runtime'/'quad-commands.log', telemetry_active,
                               LIMITS['quadpi'], STOP)
+    elif os.environ.get('DASHBOARD_QUAD_BENCH'):
+        # Arm/disarm only, through the bench port of the bridge installed on quadpi.
+        control = controls['quadpi'] = BenchControl(os.environ['DASHBOARD_QUAD_BENCH'],
+                              HERE/'runtime'/'quad-commands.log', telemetry_active,
+                              KEY, LIMITS['quadpi'], STOP)
     telemetry = [Telemetry('cruza','100.100.0.58','10.229.125.15',15610),
                  control or Telemetry('quadpi','10.223.79.20','10.223.79.20',15611),
                  DirectTelemetry('rn03','100.100.0.6',5760)]
