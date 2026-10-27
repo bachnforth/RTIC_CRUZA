@@ -98,6 +98,9 @@
 .aoi-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .aoi-head strong{font-size:14px;text-transform:capitalize}
 .aoi-score{font-variant-numeric:tabular-nums;color:#8ce7c9;font-size:13px}
+.aoi-head{flex-wrap:wrap}
+.aoi-src{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#9fb3c8;border:1px solid #33475b;border-radius:3px;padding:1px 5px}
+.aoi-cross{font-size:11px;color:#ffd479;flex-basis:100%}
 .aoi-detail{font-size:11px;color:#9bb1c1;line-height:1.6}
 .aoi-actions{display:flex;gap:8px;flex-wrap:wrap}
 .aoi-actions button{padding:6px 10px;font-size:11px}
