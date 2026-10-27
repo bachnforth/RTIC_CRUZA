@@ -1,12 +1,20 @@
-"""Validated, bounded, in-memory store of Cruza observation records.
+"""Validated, bounded, in-memory store of observation records from the fleet.
 
-Holds the recent advisory detections the Cruza observer publishes. Every record
-is validated and clamped before it is kept; malformed, non-finite or out-of-range
-fields are dropped, mirroring the telemetry decoder's discipline. Nothing is
-written to disk and nothing is ever sent to an aircraft. A detection that stays
-in view updates its existing entry rather than piling up, so the dashboard shows
-one row per distinct area of interest. Operator validation (confirm/dismiss) and
-geolocation live in the browser; this store only keeps clean, expiring facts.
+Holds the recent advisory detections each aircraft's observer publishes. Every
+record is validated and clamped before it is kept; malformed, non-finite or
+out-of-range fields are dropped, mirroring the telemetry decoder's discipline.
+Nothing is written to disk and nothing is ever sent to an aircraft. A detection
+that stays in view updates its existing entry rather than piling up, so the
+dashboard shows one row per distinct area of interest.
+
+Records are tagged with the aircraft that reported them. The source name comes
+from the reader that owns the SSH session, never from the record itself, so a
+malformed or hostile datagram cannot claim to be another aircraft. Two aircraft
+seeing the same object stay separate entries here; correlating them into one
+area of interest is swarm.py's job, from the geolocated points.
+
+Operator validation (confirm/dismiss) stays in the browser; this store only
+keeps clean, expiring facts.
 """
 import math
 import re
@@ -14,9 +22,11 @@ import threading
 import time
 
 CLASS_RE = re.compile(r"[A-Za-z0-9 _-]{1,40}")
+SOURCE_RE = re.compile(r"[a-z0-9_-]{1,16}")
 TTL_SECONDS = 20        # drop an area of interest this long after its last sighting
-MAX_ENTRIES = 50        # hard cap on tracked areas of interest
-AZIMUTH_BUCKET = 5      # degrees; same class within one bucket is the same AOI
+MAX_ENTRIES = 50        # hard cap on tracked areas of interest, fleet-wide
+AZIMUTH_BUCKET = 5      # degrees; one source's same class in one bucket is one AOI
+DEFAULT_SOURCE = "cruza"
 
 
 def _finite(value):
@@ -61,23 +71,30 @@ class ObservationStore:
         self.last_record = 0.0
 
     @staticmethod
-    def _key(obs):
-        return f"{obs['cls']}@{round(obs['az_rel_deg'] / AZIMUTH_BUCKET)}"
+    def _key(obs, source):
+        return f"{source}/{obs['cls']}@{round(obs['az_rel_deg'] / AZIMUTH_BUCKET)}"
 
-    def add(self, record, now=None):
-        """Validate and merge one record. Returns True if it was kept."""
+    def add(self, record, now=None, source=DEFAULT_SOURCE):
+        """Validate and merge one record. Returns True if it was kept.
+
+        `source` is the reporting aircraft, supplied by the reader that owns the
+        link. A record cannot name its own source.
+        """
         now = time.monotonic() if now is None else now
+        if not isinstance(source, str) or not SOURCE_RE.fullmatch(source):
+            return False
         obs = validate(record)
         if obs is None:
             return False
-        key = self._key(obs)
+        key = self._key(obs, source)
         with self.lock:
             self.last_record = now
             entry = self.items.get(key)
             if entry is None:
                 if len(self.items) >= self.max_entries:
                     self._evict_oldest(now)
-                entry = {"id": key, "cls": obs["cls"], "first_seen": now, "count": 0}
+                entry = {"id": key, "src": source, "cls": obs["cls"],
+                         "first_seen": now, "count": 0}
                 self.items[key] = entry
             entry["last_seen"] = now
             entry["count"] += 1
@@ -105,7 +122,7 @@ class ObservationStore:
             for e in self.items.values():
                 if now - e["last_seen"] > self.ttl:
                     continue
-                out.append({"id": e["id"], "cls": e["cls"],
+                out.append({"id": e["id"], "src": e["src"], "cls": e["cls"],
                             "score": round(e["score"], 3),
                             "az_rel_deg": round(e["az_rel_deg"], 2),
                             "el_rel_deg": round(e["el_rel_deg"], 2),
@@ -116,3 +133,7 @@ class ObservationStore:
             # Strongest, most recent first.
             out.sort(key=lambda o: (-o["score"], o["last_seen_age"]))
             return out
+
+    def sources(self, now=None):
+        """Aircraft that have a live area of interest, for the fleet summary."""
+        return sorted({o["src"] for o in self.snapshot(now)})
