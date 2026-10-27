@@ -1,0 +1,33 @@
+# Dashboard command filter for TFW drone. See docs/tfw-drone-dashboard-control.md.
+#
+# Connects to mavlink-router's local TCP server as one more client, so the
+# flight controller's serial port, QGC and every existing endpoint are
+# unchanged. The RTIC fleet dashboard sends commands to UDP 14551; only the
+# allowlisted shapes in safety_mavlink_filter.py reach the router (and so the
+# FC). FC traffic is copied back to whoever sent commands in the last 5 s.
+#
+# Edit before installing:
+#   - /usr/bin/python3: an interpreter with pymavlink installed
+#   - 5760: mavlink-router's TcpServerPort, if different
+[Unit]
+Description=TFW drone dashboard command filter (MAVLink allowlist)
+After=mavlink-router.service
+Wants=mavlink-router.service
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/tfw-dashboard-filter/safety_mavlink_filter.py \
+    --serial tcp:127.0.0.1:5760 \
+    --udp-target 127.0.0.1:14599 \
+    --udp-listen 14551 \
+    --status /run/tfw-dashboard-filter/status.json
+RuntimeDirectory=tfw-dashboard-filter
+Restart=always
+RestartSec=2
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

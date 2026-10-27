@@ -1,7 +1,7 @@
 'use strict';
 // One workflow for every platform: platform → command → location/altitude →
 // review → send. A platform is LIVE only when the server reports a control
-// link for it (today: quadpi with -QuadControl); every other platform stays
+// link for it (quadpi with -QuadControl, TFW drone with -TfwControl); every other platform stays
 // PREVIEW ONLY and nothing is transmitted for it. Hold, RTL and Land for a
 // live platform also sit in a one-click row that skips review.
 (function () {
@@ -240,7 +240,7 @@
       if (key && drawer) drawer.open = true;
       document.querySelector('#wf-badge-text').textContent = key ? 'LIVE' : 'PREVIEW ONLY';
       const notice = document.querySelector('.notice');
-      notice.textContent = key ? `Live control ON for ${Object.keys(controls).map(id => names[id]).join(', ')} · Pocket is the override · other aircraft are read-only` : 'Read-only · Pilot QGroundControl connections remain independent';
+      notice.textContent = key ? `Live control ON for ${Object.keys(controls).map(id => names[id]).join(', ')} · each safety pilot's RC is the override · other aircraft are read-only` : 'Read-only · Pilot QGroundControl connections remain independent';
       notice.classList.toggle('notice-control', !!key);
       document.querySelector('footer p:last-child').textContent = key
         ? 'Pause stops extra video; telemetry continues. Live control is ON for the platforms marked LIVE; the rest have no flight controls.'

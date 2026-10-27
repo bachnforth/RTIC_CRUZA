@@ -1,7 +1,9 @@
-"""quadpi click-to-fly control over the Pi's filtered MAVLink bridge.
+"""Click-to-fly control of an ArduCopter over its Pi's filtered MAVLink bridge.
 
-Disabled unless DASHBOARD_QUAD_CONTROL=host:port names the bridge's UDP listen
-port (10.223.79.20:14551 on quadpi; a local bridge for SITL). The bridge only
+Disabled unless DASHBOARD_QUAD_CONTROL=host:port names quadpi's bridge UDP
+listen port (10.223.79.20:14551; a local bridge for SITL), or
+DASHBOARD_TFW_CONTROL names TFW drone's (see docs/tfw-drone-dashboard-control.md).
+The same link and command set serve both aircraft. The bridge only
 passes the exact command shapes sent here, and the Pocket stays the safety
 pilot's override. Every command is logged to runtime/quad-commands.log.
 
@@ -108,7 +110,9 @@ def number(body, key, low, high):
 class QuadControl:
     """One UDP link to the bridge: sends commands, receives the FC stream."""
     def __init__(self, target, log_path, active, limits=None, stop=None,
-                 gcs=GCS, actions=ACTION_INFO):
+                 gcs=GCS, actions=ACTION_INFO, name='quadpi', title=None):
+        self.name = name                          # dashboard platform id
+        self.title = title or name                # for messages
         self.target = target
         self.label = '%s:%d' % target
         self.gcs = gcs
@@ -119,7 +123,7 @@ class QuadControl:
         self.active = active                      # callable: is a page open?
         self.stop = stop or threading.Event()
         self.log_path = Path(log_path)
-        self.state = VehicleState('quadpi', limits=limits)
+        self.state = VehicleState(name, limits=limits)
         self.encoder = mav.MAVLink(None, srcSystem=gcs[0], srcComponent=gcs[1])
         self.adopt_gcs_id = True                  # the bench link keeps its fixed 254
         self.parser = mav.MAVLink(None)
@@ -512,7 +516,7 @@ class QuadControl:
     def plan(self, action, body, entry):
         v = self.vehicle()
         if not v['online']:
-            raise CommandError('No recent heartbeat from quadpi')
+            raise CommandError(f'No recent heartbeat from {self.title}')
         if self.adopt_gcs_id and not any(p in self.params for p in GCS_ID_PARAMS):
             raise CommandError('GCS system id not read from the aircraft yet; try again shortly')
         if action == 'arm':

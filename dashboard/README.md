@@ -7,14 +7,14 @@ platform, 2 · a command, 3 · a map point and/or altitude when the command need
 them, 4 · review, then send. Each platform is labelled **LIVE** or
 **preview only** in the menu.
 
-- **LIVE** (today only quadpi, and only when started with `-QuadControl`): the
-  review button reads *Send to quadpi*, the review expires after 20 s, and the
+- **LIVE** (quadpi when started with `-QuadControl`, TFW drone with
+  `-TfwControl`): the review button reads *Send to <aircraft>*, the review expires after 20 s, and the
   aircraft's acknowledgement or refusal reason appears below. Hold (BRAKE),
   RTL and Land are also in an **Immediate** row next to the aircraft's status
   line; they send on one click without review. That row sits away from the
   Send button on purpose: during SITL testing a page shift turned a click aimed
   at Send into Hold when the two were adjacent.
-- **Preview only** (Cruza and TFW drone): menus illustrate the workflow, a
+- **Preview only** (Cruza, and TFW drone without `-TfwControl`): menus illustrate the workflow, a
   completed preview transmits nothing, and the server refuses any `/control`
   request for these platforms (HTTP 403).
 
@@ -27,7 +27,12 @@ preview menu.
 
 Adding another live platform means a control link for it in `control.py`
 (registered in `server.py`'s `controls`) plus its own reviewed command
-allowlist on that aircraft's companion computer.
+allowlist on that aircraft's companion computer. TFW drone uses the same
+`QuadControl` link and command set as quadpi, through the same filter run as a
+mavlink-router client on its Pi; its owner's install guide is
+[docs/tfw-drone-dashboard-control.md](../docs/tfw-drone-dashboard-control.md)
+and the files are in `partner/tfw-drone/`. Its commands are logged to
+`runtime/tfw-commands.log`.
 
 Open **http://127.0.0.1:8765** on this laptop. Both camera pictures were verified
 in the browser on 2026-10-15. The viewer is local-only and has no flight controls,

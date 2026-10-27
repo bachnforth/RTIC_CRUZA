@@ -23,7 +23,7 @@ from control import BenchControl, QuadControl, parse_target
 # snapshot); update them here if those parameters change. quadpi's battery
 # limits are unknown, so its battery and airspeed checks stay off.
 LIMITS = {'cruza': Limits(battery_low_v=14.0, battery_critical_v=13.2, airspeed_min_m_s=10),
-          'quadpi': Limits()}
+          'quadpi': Limits(), 'rn03': Limits()}
 
 HERE = Path(__file__).resolve().parent
 IMAGERY = HERE/'runtime'/'imagery'
@@ -35,7 +35,7 @@ last_telemetry_viewer = 0
 feeds = []
 telemetry = []
 media = None
-controls = {}   # platform name -> live control link (only quadpi so far)
+controls = {}   # platform name -> live control link (quadpi, rn03 = TFW drone)
 ORIGINS = ('http://127.0.0.1:8765', 'http://localhost:8765')
 
 
@@ -463,12 +463,20 @@ def main():
         control = controls['quadpi'] = BenchControl(os.environ['DASHBOARD_QUAD_BENCH'],
                               HERE/'runtime'/'quad-commands.log', telemetry_active,
                               KEY, LIMITS['quadpi'], STOP)
+    # TFW drone: the same link and commands, through the filter its owner runs
+    # on the aircraft's Pi (docs/tfw-drone-dashboard-control.md). When enabled
+    # it also supplies TFW drone telemetry instead of the read-only TCP reader.
+    tfw = None
+    if os.environ.get('DASHBOARD_TFW_CONTROL'):
+        tfw = controls['rn03'] = QuadControl(parse_target(os.environ['DASHBOARD_TFW_CONTROL']),
+                              HERE/'runtime'/'tfw-commands.log', telemetry_active,
+                              LIMITS['rn03'], STOP, name='rn03', title='TFW drone')
     telemetry = [Telemetry('cruza','100.100.0.58','10.229.125.15',15610),
                  control or Telemetry('quadpi','10.223.79.20','10.223.79.20',15611),
-                 DirectTelemetry('rn03','100.100.0.6',5760)]
+                 tfw or DirectTelemetry('rn03','100.100.0.6',5760)]
     for source in telemetry:
-        if source is control:
-            control.start()
+        if source is control or source is tfw:
+            source.start()
         else:
             source.thread.start()
     threading.Thread(target=supervisor, daemon=True).start()
