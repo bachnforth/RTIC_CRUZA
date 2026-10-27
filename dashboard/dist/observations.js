@@ -16,7 +16,9 @@
   // cueing, NOT a calibrated sensor model — measure them on the airframe and
   // correct here. Field of view lives in the Pi observer config (hfov/vfov).
   const MOUNT_YAW_DEG = 0;         // camera points along the nose
-  const MOUNT_PITCH_DOWN_DEG = 15; // boresight tilted this far below level
+  const MOUNT_PITCH_DOWN_DEG = 25; // boresight tilted this far below level
+                                   // (nose sled design: AI Camera in the chin,
+                                   // 25 deg down, 52 deg vertical view)
   const MAX_RANGE_M = 1500;        // never project an area of interest past this
   const DEFAULT_RANGE_M = 150;     // used only when depression can't give a range
   const R = 6371000;

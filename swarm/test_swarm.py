@@ -40,9 +40,12 @@ class GeolocateTests(unittest.TestCase):
         self.assertAlmostEqual(g['bearing_deg'], 340.0, places=6)
 
     def test_range_comes_from_depression_and_height(self):
-        # 100 m up, boresight 15 deg down, level flight, detection centred.
+        # 100 m up, level flight, detection centred: the range is set by the
+        # configured mount angle. Derived, not pinned - calibration changes it.
+        down = swarm.SENSORS['cruza']['pitch_down']
         g = swarm.geolocate(obs(), state('cruza', agl=100.0))
-        self.assertAlmostEqual(g['range_m'], 100/math.tan(math.radians(15)), places=3)
+        self.assertAlmostEqual(g['range_m'], 100/math.tan(math.radians(down)),
+                               places=3)
         self.assertFalse(g['estimated'])
 
     def test_aircraft_pitch_changes_the_depression(self):
@@ -51,11 +54,18 @@ class GeolocateTests(unittest.TestCase):
         self.assertGreater(nose_up['range_m'], level['range_m'])
 
     def test_range_is_capped_not_runaway(self):
-        g = swarm.geolocate(obs(el=12.9), state('cruza', agl=100.0))
+        # Just inside the usable band: a very shallow look-down, which without
+        # the cap would project the point kilometres away.
+        shallow = swarm.SENSORS['cruza']['pitch_down']-swarm.MIN_DEPRESSION_DEG-0.1
+        g = swarm.geolocate(obs(el=shallow), state('cruza', agl=100.0))
+        self.assertIsNotNone(g['range_m'])
         self.assertLessEqual(g['range_m'], swarm.MAX_RANGE_M)
 
     def test_shallow_or_upward_look_gives_no_range(self):
-        g = swarm.geolocate(obs(el=20.0), state('cruza', agl=100.0))
+        # Look far enough above the boresight that the ray never meets the
+        # ground, whatever the mount angle currently is.
+        above = swarm.SENSORS['cruza']['pitch_down']+5.0
+        g = swarm.geolocate(obs(el=above), state('cruza', agl=100.0))
         self.assertIsNone(g['range_m'])
         self.assertTrue(g['estimated'])
         self.assertIsNotNone(g['lat'])  # still placed, at the default range
@@ -226,6 +236,8 @@ class PictureTests(unittest.TestCase):
             * math.tan(math.radians(swarm.SENSORS['rn03']['pitch_down']))
         fleet = [state('cruza', agl=100.0, heading=90.0),
                  state('rn03', agl=rn03_agl, heading=90.0)]
+        # (With both airframes on the same mount angle this is just equal
+        # heights; the arithmetic keeps it right if either is recalibrated.)
         items = [obs(src='cruza', oid='cruza/person@0'),
                  obs(src='rn03', oid='rn03/person@0')]
         picture = swarm.picture(items, fleet)
@@ -235,10 +247,19 @@ class PictureTests(unittest.TestCase):
     def test_the_same_bearing_from_differently_mounted_cameras_does_not_fuse(self):
         # The flip side, and a real trap: equal height and heading is not the
         # same look angle. An uncalibrated mount shows up as two tracks.
-        fleet = [state('cruza', agl=100.0, heading=90.0),
-                 state('rn03', agl=100.0, heading=90.0)]
-        picture = swarm.picture([obs(src='cruza', oid='cruza/person@0'),
-                                 obs(src='rn03', oid='rn03/person@0')], fleet)
+        # The mounts are set explicitly here rather than relying on whatever two
+        # airframes happen to be configured as - after calibration any two can
+        # end up similar, which would silently stop testing anything.
+        saved = {k: dict(v) for k, v in swarm.SENSORS.items()}
+        try:
+            swarm.SENSORS['cruza']['pitch_down'] = 15.0
+            swarm.SENSORS['rn03']['pitch_down'] = 35.0
+            fleet = [state('cruza', agl=100.0, heading=90.0),
+                     state('rn03', agl=100.0, heading=90.0)]
+            picture = swarm.picture([obs(src='cruza', oid='cruza/person@0'),
+                                     obs(src='rn03', oid='rn03/person@0')], fleet)
+        finally:
+            swarm.SENSORS.update(saved)
         self.assertEqual(picture['cross_cued'], 0)
         self.assertEqual(len(picture['tracks']), 2)
 

@@ -6,7 +6,7 @@ with usable positions — and does it notice when two of them are looking at the
 same thing?
 
 That second half is the swarm effect worth having. One aircraft saying "something
-at bearing 121, about 660 m out" is a guess. Two aircraft independently putting
+at bearing 121, about 300 m out" is a guess. Two aircraft independently putting
 the same class of object in the same 100 m of ground is a reason to go look.
 
 **Nothing in this folder, or in the code it tests, transmits to an aircraft.**
@@ -58,7 +58,8 @@ What changed to make the test possible, because the old path could not do it:
 
 ## Results, 26 Oct 2026 (bench, real flight track)
 
-`swarm/bench-report-2026-10-26.json`, flown against the Cruza's real 20 Oct
+`swarm/bench-report-2026-10-27.json` (and `-10-26`, before the mount was
+corrected), flown against the Cruza's real 20 Oct
 log (`logs/2026-10-20/.../log_00030.records.json`), mid-flight sample:
 33.734325, -85.921209 at 109 m AGL, heading 121, pitch 5.6.
 
@@ -69,19 +70,26 @@ and resolves 150 reports in 0.5 ms.
 
 The number that matters is not the pass. It is this:
 
-| Model error | Cruza (660 m slant) | quadpi (90 m) | rn03 (70 m) |
+| Model error | Cruza (309 m) | quadpi (90 m) | rn03 (70 m) |
 |---|---|---|---|
-| heading off 1° | 12 m | 2 m | 1 m |
-| heading off 5° | 58 m | 8 m | 6 m |
-| **mount pitch off 1°** | **65 m** | 3 m | 3 m |
-| **mount pitch off 5°** | **235 m** | 15 m | 12 m |
-| relative altitude off 10% | 66 m | 9 m | 7 m |
+| heading off 1° | 5 m | 2 m | 1 m |
+| heading off 5° | 27 m | 8 m | 6 m |
+| **mount pitch off 1°** | **16 m** | 3 m | 3 m |
+| **mount pitch off 5°** | **69 m** | 15 m | 12 m |
+| relative altitude off 10% | 31 m | 9 m | 7 m |
 
-**Camera mount pitch is the dominant error term, and it is worst exactly where
-the Cruza is most useful.** At a shallow look-down angle the range comes out of
-`altitude / tan(depression)`, so one degree of uncalibrated tilt moves the point
-65 m at 660 m — five degrees moves it 235 m, further than the fusion radius, at
-which point the Cruza and the quad stop agreeing they are seeing one object.
+**Camera mount pitch is the dominant error term** — about three times what
+heading costs, and the one nobody notices, because a mis-set mount is silently
+consistent. The range comes out of `altitude / tan(depression)`, so the shallower
+the look-down the more a tilt error stretches it.
+
+**These figures were themselves corrected on 27 Oct.** `SENSORS` carried 15° for
+the Cruza until the nose sled design was checked: the AI Camera sits in the chin
+at **25° down** with a **52° vertical view**. At the 20 Oct geometry that mistake
+put a centred cue **348 m** beyond the truth — nearly three times the fusion
+radius, so the Cruza would never have correlated with a quad. The steeper real
+mount also shortens the working range from 657 m to 309 m, which is why every
+number above is smaller than it used to be.
 
 The operational reading is the concept of employment the fleet already assumed:
 **the Cruza's cue is a direction to go look, not a location.** The close-in

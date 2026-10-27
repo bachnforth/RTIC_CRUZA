@@ -5,9 +5,9 @@ Why this exists: swarm.py turns a detection's angles off the camera boresight
 into a point on the ground, and it can only do that by trusting four numbers per
 airframe - mount yaw, mount pitch-down, and the horizontal and vertical field of
 view. The bench sweep says a 1-degree pitch-down error moves the Cruza's point 65
-metres at 660 m range, and 5 degrees moves it 235 m, far enough that two aircraft
-stop agreeing they are looking at one object. So these four numbers are the whole
-accuracy of the shared picture.
+metres at the Cruza's ~309 m working range, and 10 degrees moves it 348 m, far
+enough that two aircraft stop agreeing they are looking at one object. So these
+four numbers are the whole accuracy of the shared picture.
 
 The method needs no optimiser. Put something the detector recognises at a
 surveyed point, record what each camera reports while the aircraft's own
@@ -73,8 +73,8 @@ MIN_CAMERA_HEIGHT_M = 0.5    # below this the depression is noise, even on a tri
 # ground calibration while meaning nothing in flight. Camera 1.2 m up with the
 # marker 4.5 m out: a 0.85 m box centre makes the depression 4.5 deg instead of
 # 14.9, so pitch_down comes out 10.5 deg wrong. The same 0.85 m at 100 m over a
-# 660 m slant shifts it 0.07 deg. So target_height matters on the ground and is
-# safely ignored in the air, and it is the caller's job to say what it is.
+# 309 m slant shifts it 0.14 deg. So target_height matters on the ground and
+# is safely ignored in the air, and it is the caller's job to say what it is.
 
 
 # --------------------------------------------------------------------------
@@ -384,10 +384,15 @@ def solve(args):
                         'so this yaw is the mount alone - good. It is a single '
                         'look angle, so confirm pitch_down in flight before '
                         'trusting a long-range cue.')
+        # Quote the cost at the range the operator actually cares about, not a
+        # baked-in one: the Cruza's working range moved from 657 m to 309 m the
+        # moment its real 25 deg mount was accounted for.
+        quote_at = args.reference_range or 310.0
         warnings.append(f'Everything scales with the two tape numbers. At '
                         f'{args.height:.2f} m and {args.distance:.2f} m, 2 cm of '
                         f'height error moves pitch_down {wobble:.2f} deg, which '
-                        f'is {metres_at(wobble, 660):.0f} m at 660 m range.')
+                        f'is {metres_at(wobble, quote_at):.0f} m at '
+                        f'{quote_at:.0f} m range.')
     elif heading_spread < 90 and len(used) > 1:
         warnings.append(f'Headings span only {heading_spread:.0f} deg, so the yaw '
                         'figure includes any compass bias. Observe the point from '

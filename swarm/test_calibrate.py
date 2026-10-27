@@ -298,8 +298,11 @@ class SolveTests(unittest.TestCase):
         out = run(calibrate.solve, records=records, log=log, cls='person',
                   ground_alt=150.0, reference_range=660.0)
         self.assertIn('What this is worth at 660 m', out)
-        # 6 degrees of pitch correction at 660 m is about 69 m.
-        self.assertRegex(out, r'correcting pitch_down moves the point\s+69\.\d m')
+        # However far the measured mount is from the configured one, the tool
+        # must quote that correction as range x angle-in-radians.
+        delta = abs(21.0-swarm.SENSORS['cruza']['pitch_down'])
+        self.assertIn(f'correcting pitch_down moves the point '
+                      f'{calibrate.metres_at(delta, 660.0):7.1f} m', out)
 
     def test_no_usable_records_is_an_error_not_a_guess(self):
         path = Path(self.dir)/'empty.jsonl'
@@ -468,19 +471,29 @@ class FovTests(unittest.TestCase):
         self.dir = tempfile.mkdtemp()
 
     def test_fov_recovers_a_wrong_field_of_view(self):
-        real = {'hfov': 78.0, 'vfov': 58.0, 'yaw': 0.0, 'pitch_down': 15.0}
+        # The detector believes the CONFIGURED field of view, so take that from
+        # SENSORS and make the real lens 1.2x wider; the tool should recover it
+        # whatever the configured numbers happen to be.
+        model = swarm.sensor('cruza')
+        config = {'hfov': model['hfov'], 'vfov': model['vfov']}
+        real = {'hfov': config['hfov']*1.2, 'vfov': config['vfov']*1.2,
+                'yaw': 0.0, 'pitch_down': 15.0}
         rows = synth(real, count=16, agl=85.0, off_az=22.0, depression=28.0,
-                     config={'hfov': 66.0, 'vfov': 49.0})
+                     config=config)
         records, log = write_pair(rows, self.dir)
         out = run(calibrate.fov, records=records, log=log, cls='person',
                   ground_alt=150.0, yaw=0.0, pitch_down=15.0)
-        self.assertRegex(out, r'hfov: configured 66\.0 deg -> measured 78\.\d deg')
-        self.assertRegex(out, r'vfov: configured 49\.0 deg -> measured 58\.\d deg')
+        self.assertIn(f'hfov: configured {config["hfov"]:.1f} deg -> measured '
+                      f'{real["hfov"]:.1f} deg', out)
+        self.assertIn(f'vfov: configured {config["vfov"]:.1f} deg -> measured '
+                      f'{real["vfov"]:.1f} deg', out)
 
     def test_a_correct_field_of_view_is_left_alone(self):
-        real = {'hfov': 66.0, 'vfov': 49.0, 'yaw': 0.0, 'pitch_down': 15.0}
+        model = swarm.sensor('cruza')
+        config = {'hfov': model['hfov'], 'vfov': model['vfov']}
+        real = {**config, 'yaw': 0.0, 'pitch_down': 15.0}
         rows = synth(real, count=16, agl=85.0, off_az=22.0, depression=28.0,
-                     config={'hfov': 66.0, 'vfov': 49.0})
+                     config=config)
         records, log = write_pair(rows, self.dir)
         out = run(calibrate.fov, records=records, log=log, cls='person',
                   ground_alt=150.0, yaw=0.0, pitch_down=15.0)
@@ -498,14 +511,16 @@ class FovTests(unittest.TestCase):
 
 class CheckTests(unittest.TestCase):
     def test_check_finds_the_boresight_ground_point(self):
+        # Derived from the configured mount, so recalibrating does not break it.
+        down = swarm.SENSORS['cruza']['pitch_down']
+        expected = 3.0/math.tan(math.radians(down))
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
             calibrate.check(argparse.Namespace(
                 source='cruza', height=3.0, pitch=0.0, pitch_down=None,
-                target_height=0.0, distances=[4, 8, 11.2, 20, 60]))
+                target_height=0.0, distances=[4, 8, expected, 20, 60]))
         out = buffer.getvalue()
-        # 3 m up with a 15 degree mount puts the boresight at about 11.2 m.
-        self.assertIn('meets the ground at 11.2 m', out)
+        self.assertIn(f'meets the ground at {expected:.1f} m', out)
         self.assertIn('centred', out)
 
     def test_check_warns_when_no_target_height_is_given(self):
@@ -518,15 +533,19 @@ class CheckTests(unittest.TestCase):
 
     def test_check_applies_the_target_height(self):
         # 1.2 m camera, box centre 0.85 m up: only 0.35 m of working height, so
-        # the boresight meets the ground far closer in than 4.5 m.
+        # the boresight meets the ground far closer in than it otherwise would.
+        down = swarm.SENSORS['cruza']['pitch_down']
+        near = 0.35/math.tan(math.radians(down))
+        far = 1.2/math.tan(math.radians(down))
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
             calibrate.check(argparse.Namespace(
                 source='cruza', height=1.2, pitch=0.0, pitch_down=None,
-                target_height=0.85, distances=[1.3, 4.5]))
+                target_height=0.85, distances=[near, 4.5]))
         out = buffer.getvalue()
         self.assertIn('0.35 m of working height', out)
-        self.assertIn('meets the ground at 1.3 m', out)
+        self.assertIn(f'meets the ground at {near:.1f} m', out)
+        self.assertLess(near, far)  # the correction pulls the marker in
 
     def test_check_names_what_falls_outside_the_frame(self):
         buffer = io.StringIO()

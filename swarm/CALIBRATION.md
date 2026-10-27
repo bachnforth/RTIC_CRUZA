@@ -5,19 +5,43 @@ picture's accuracy entirely depends on — mount yaw, mount pitch-down, and the
 horizontal and vertical field of view — then fly a three-platform cross-cue and
 measure how closely the platforms agree.
 
-**Why pitch-down first.** From the bench sweep, at the Cruza's real 660 m slant
-range:
+**Why pitch-down first.** From the bench sweep, at the Cruza's real working
+range of about 309 m (109 m AGL, 25° mount, 5.6° nose-up):
 
-| Model error | Cruza (660 m) | quadpi (90 m) | rn03 (70 m) |
+| Model error | Cruza (309 m) | quadpi (90 m) | rn03 (70 m) |
 |---|---|---|---|
-| heading off 1° | 12 m | 2 m | 1 m |
-| **mount pitch off 1°** | **65 m** | 3 m | 3 m |
-| **mount pitch off 5°** | **235 m** | 15 m | 12 m |
+| heading off 1° | 5 m | 2 m | 1 m |
+| heading off 5° | 27 m | 8 m | 6 m |
+| **mount pitch off 1°** | **16 m** | 3 m | 3 m |
+| **mount pitch off 5°** | **69 m** | 15 m | 12 m |
+| relative altitude off 10% | 31 m | 9 m | 7 m |
 
-Five degrees of uncalibrated tilt on the Cruza puts its point 235 m out — past
-the 120 m fusion radius, so it stops agreeing with the quad that they are
-looking at one object, which is the whole capability. Everything below is
-ordered by what buys the most accuracy per minute spent.
+Mount pitch costs about three times what heading does, and it is the error
+nobody notices, because a mis-set mount is silently consistent. Ten degrees of
+it puts the Cruza's point **348 m** out — nearly three times the 120 m fusion
+radius, so it stops agreeing with the quad that they are looking at one object,
+which is the whole capability. Five degrees (69 m) still lands inside the
+radius, so the platforms would agree, just less precisely.
+
+**This already bit us.** `swarm.SENSORS` carried 15° for the Cruza until the nose
+sled design was checked on 27 Oct, which puts the AI Camera in the chin at **25°
+down** with a **52° vertical view**. At the 20 Oct flight geometry (109 m AGL,
+5.6° nose-up) a centred cue resolved with 15° lands about **350 m beyond** the
+truth, because a shallower assumed look-down stretches the range. That is nearly
+three times the fusion radius — the Cruza would never have correlated with a
+quad. SENSORS now carries the design figures, but they are design intent for the
+printed nose, not a measurement of the assembled one, which is what the rest of
+this document is for.
+
+**A second discrepancy to settle while calibrating:** the design says the AI
+Camera has a **52°** vertical view (the Raspberry Pi AI Camera's published figure
+is about 52.3°), but the Pi's `observe` config still says `vfov_deg: 49.0`. That
+config value is what computes the reported angles, so until it is changed on the
+aircraft every vertical angle is under-reported by roughly 6 per cent, about
+0.6° at 10° off boresight. `swarm.SENSORS` has been set to 52; the aircraft has
+not. Phase 2 measures it — make the two agree.
+
+Everything below is ordered by what buys the most accuracy per minute spent.
 
 Nothing in this procedure transmits to an aircraft. The tools read the camera and
 write to one loopback port.
@@ -67,7 +91,7 @@ These are the things that cannot be fixed at 07:00.
 The detector reports the **centre of its bounding box**, and `swarm.py` places
 that point on the ground. For a standing person the box spans head to feet, so
 its centre sits at roughly **half their height**. In flight that is irrelevant:
-at 100 m over a 660 m slant, a 0.85 m torso offset moves the angle by 0.07°. On
+at 100 m over a 309 m slant, a 0.85 m torso offset moves the angle by 0.13°. On
 the ground at 4.5 m it moves it by **10.5°**, which would hand you a
 pitch-down figure wrong by more than the error you came to remove.
 
@@ -76,28 +100,38 @@ to be meaningfully above the target's torso:
 
 | Camera height | Working height | Marker at, cruza | quadpi | rn03 |
 |---|---|---|---|---|
-| 1.2 m (table) | 0.35 m | 1.3 m | 0.6 m | 0.8 m |
-| 1.8 m | 0.95 m | 3.6 m | 1.7 m | 2.0 m |
-| **2.6 m (ladder)** | **1.75 m** | **6.5 m** | **3.0 m** | **3.8 m** |
-| 3.2 m | 2.35 m | 8.8 m | 4.1 m | 5.0 m |
+| 1.2 m (table) | 0.33 m | 0.7 m | 0.6 m | 0.7 m |
+| 1.8 m | 0.93 m | 2.0 m | 1.6 m | 2.0 m |
+| **2.6 m (ladder)** | **1.73 m** | **3.7 m** | **3.0 m** | **3.7 m** |
+| 3.2 m | 2.33 m | 5.0 m | 4.0 m | 5.0 m |
 
-A table at 1.2 m puts the marker 1.3 m from the lens, which is useless. **Use the
-ladder.** Those marker distances assume the *placeholder* mount angles, which is
-what you are there to measure, so treat them as where to stand first — then walk
-in or out until the detection sits near the middle of the frame. The solver
+A table at 1.2 m puts the marker well under a metre from the lens, which is
+useless. **Use the ladder.** The Cruza column now comes from the nose sled
+design — AI Camera in the chin, 25 deg down, 52 deg vertical view — so it is a
+real starting point rather than a guess; quadpi and rn03 are still placeholders.
+Either way, walk the marker in or out until the detection sits near the middle
+of the frame.
+
+**The centred window is narrower than you might expect.** At 2.6 m with the
+Cruza's 25 deg mount, `solve` accepts only samples between about **2.7 m and
+5.7 m**; past that the target is more than 8 degrees off boresight and is
+excluded. Stay inside that band unless you pass `--all-samples`. The solver
 handles any position that is in frame; centring only keeps a field-of-view error
 out of the mount result.
 
 Accuracy you can expect at 2.6 m, from getting the box-centre height wrong:
 
-| Box centre off by | Cruza error | → at 660 m |
+| Box centre off by | Mount error | → ground error at 309 m |
 |---|---|---|
-| 5 cm | 0.41° | 4.7 m |
-| 10 cm | 0.82° | 9.4 m |
-| 20 cm | 1.62° | 18.7 m |
+| 5 cm | 0.63° | 10.5 m |
+| 10 cm | 1.26° | 20.3 m |
+| 20 cm | 2.48° | 38.1 m |
 
-Measure the target person's height and halve it; ±10 cm is easy and leaves under
-10 m at operational range, against the 235 m you are removing.
+This got *worse* when the mount was corrected to 25 deg, because the marker now
+stands at 3.7 m rather than 6.5 m and the same vertical error is a bigger angle
+at shorter range. Measure the target person's height and halve it; ±10 cm
+leaves about 20 m at operational range, against the **348 m** that the old
+15 deg figure would have cost.
 
 **Level the airframe against the autopilot, not against the ground.** The
 pitch-down angle must be measured in the frame the EKF calls level, because that
@@ -138,16 +172,19 @@ Do the Cruza first. It has the longest operating range, so it gains the most.
 6. Watch the progress lines. You want 25 or more records. If none arrive, the
    target is not being detected: check the class is in the `observe` config's
    `classes` list and that the score clears `min_score` (0.55).
-7. **Move the marker to a second, clearly different distance** — say 4 m and
-   9 m — and capture again to a second file. This is the cross-check that
-   validates your target-height number, and it costs five minutes.
+7. **Move the marker to a second, clearly different distance** — for the Cruza
+   use about **3.0 m and 5.5 m**, both inside the centred window — and capture
+   again to a second file. This is the cross-check that validates your
+   target-height number, and it costs five minutes. (The 4 m / 9 m pair that
+   suited the old 15 deg assumption no longer works: at 9 m the target sits
+   14 deg off boresight and `solve` drops it.)
 8. Pull both files to the laptop and solve each:
 
    ```bash
    python swarm/calibrate.py solve --source cruza \
      --records cal-cruza-near.jsonl \
-     --height 2.60 --distance 4.00 --target-height 0.87 \
-     --reference-range 660 --out swarm/cal-cruza-near.json
+     --height 2.60 --distance 3.00 --target-height 0.87 \
+     --reference-range 310 --out swarm/cal-cruza-near.json
    ```
 
 9. **Compare the two distances.** If `pitch_down` agrees within about half a
@@ -162,9 +199,10 @@ Do the Cruza first. It has the longest operating range, so it gains the most.
    | near **lower** than far | you assumed it **too high** | lower `--target-height` |
    | near == far | correct | use the number |
 
-   Worked, with the truth at 0.87 m and a real pitch-down of 21.0°: assuming
-   0.72 m reads 22.78° near and 21.92° far (+0.86 apart); assuming 1.02 m reads
-   19.16° and 20.08° (−0.91 apart); assuming 0.87 m reads 21.00° at both.
+   Worked for the 3.0 / 5.5 m pair, with the truth at 0.87 m and a real
+   pitch-down of 25.0°: assuming 0.72 m reads 27.10° near and 26.41° far
+   (+0.69 apart); assuming 1.02 m reads 22.80° and 23.57° (−0.76 apart);
+   assuming 0.87 m reads 25.00° at both.
    Re-solve both files at adjusted values until they agree — the data does not
    need recollecting, so this is a laptop job, not a field job.
 10. Paste the suggested block into `swarm.SENSORS` in
@@ -189,11 +227,12 @@ the mount angles matter far more. If you do not know it, a wrong field of view
 scales every reported angle and will quietly corrupt everything.
 
 Same setup, but **move the marker well off to one side** — past about 8° off
-boresight, which at 6.5 m is roughly 0.9 m sideways. Capture, then:
+boresight, which at the Cruza's 3.7 m is roughly **0.55 m sideways**. Capture,
+then:
 
 ```bash
 python swarm/calibrate.py fov --source cruza --records cal-cruza-edge.jsonl \
-  --height 2.60 --distance 6.50 --offset 0.90 --target-height 0.87 \
+  --height 2.60 --distance 3.70 --offset 0.55 --target-height 0.87 \
   --yaw <from phase 1> --pitch-down <from phase 1>
 ```
 
@@ -245,7 +284,7 @@ is the best mount number you will get:
 ```bash
 python swarm/calibrate.py solve --source cruza --records cal-flight.jsonl \
   --log logs/<date>/<download>/log_000NN.records.json \
-  --lat <truth lat> --lon <truth lon> --reference-range 660
+  --lat <truth lat> --lon <truth lon> --reference-range 310
 ```
 
 ### Pass criteria
@@ -255,7 +294,7 @@ python swarm/calibrate.py solve --source cruza --records cal-flight.jsonl \
 | Mount solve scatter | under 1° std dev | `solve` output |
 | Near vs far distance agreement | within 0.5° | two `solve` runs |
 | Heading spread in flight | 90° or more | `solve` output |
-| Cruza geolocation vs truth | within 50 m at ≤700 m | `solve`, or the map |
+| Cruza geolocation vs truth | within 40 m at ≤350 m | `solve`, or the map |
 | Quad geolocation vs truth | within 15 m at ≤100 m | the map |
 | Two platforms on one object | `span_m` under 50 m | the AOI row's "N m apart" |
 | Two objects 500 m apart | two separate tracks | the AOI panel |
