@@ -15,8 +15,10 @@ import struct
 import subprocess
 import threading
 import time
+import swarm
 from fleet import Limits, VehicleState
 from control import BenchControl, QuadControl, parse_target
+from observations import ObservationStore
 
 # Alert thresholds. Cruza's values copy its own flight-controller settings
 # (BATT_LOW_VOLT 14.0, BATT_CRT_VOLT 13.2, AIRSPEED_MIN 10 in the 2026-10-14
@@ -25,15 +27,27 @@ from control import BenchControl, QuadControl, parse_target
 LIMITS = {'cruza': Limits(battery_low_v=14.0, battery_critical_v=13.2, airspeed_min_m_s=10),
           'quadpi': Limits(), 'rn03': Limits()}
 
+# Aircraft whose observation tap is installed and may be read. An aircraft is
+# listed here only after companion/deploy-observe.sh has run on its Pi and the
+# camera mount angles in swarm.SENSORS have been measured on that airframe;
+# starting a reader for a Pi without the tap only produces a retry loop and a
+# misleading error in the panel. Each entry is (name, host, user, remote port).
+# All three are wired for the swarm test; comment one out to leave it alone.
+OBSERVE_SOURCES = [('cruza', '100.100.0.34', 'jbrascom', 15620),
+                   ('quadpi', '10.223.79.20', 'ebach', 15621),
+                   ('rn03', '100.100.0.6', 'jbrascom', 15622)]
+
 HERE = Path(__file__).resolve().parent
 IMAGERY = HERE/'runtime'/'imagery'
 IMAGERY_PATH = re.compile(r'/imagery/(manifest\.json|\d{1,2}/\d{1,7}/\d{1,7})')
-KEY = Path.home()/'.ssh'/'id_ed25519_rpi'
+KEY = Path.home()/'.ssh'/'id_ed25519_pi'
 STOP = threading.Event()
 last_viewer = 0
 last_telemetry_viewer = 0
 feeds = []
 telemetry = []
+observers = []
+observations = ObservationStore()
 media = None
 controls = {}   # platform name -> live control link (quadpi, rn03 = TFW drone)
 ORIGINS = ('http://127.0.0.1:8765', 'http://localhost:8765')
@@ -58,9 +72,10 @@ def read_exact(stream, length):
 
 
 class Feed:
-    def __init__(self, name, host, alias, remote_port, local_port):
+    def __init__(self, name, host, alias, remote_port, local_port, user='ebach'):
         self.name, self.host, self.alias = name, host, alias
         self.remote_port, self.local_port = remote_port, local_port
+        self.user = user
         self.proc = None
         self.lock = threading.Lock()
         self.total = self.packets = self.last_packet = 0
@@ -88,7 +103,7 @@ class Feed:
                         '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes',
                         '-o', 'ConnectTimeout=6', '-o', 'ServerAliveInterval=5',
                         '-o', 'ServerAliveCountMax=2', '-o', 'LogLevel=ERROR',
-                        '-o', 'HostKeyAlias='+self.alias, 'ebach@'+self.host,
+                        '-o', 'HostKeyAlias='+self.alias, self.user+'@'+self.host,
                         'python3 /opt/cruza-video-tap.py --port '+str(self.remote_port)]
                 errors = deque(maxlen=2)
                 try:
@@ -316,6 +331,149 @@ class Telemetry:
             STOP.wait(3)
 
 
+class UdpFeed:
+    """Receives a pushed RTP video stream on a VPN port and forwards it to the
+    local MediaMTX ingest. Used for the TFW drone (rn03), whose onboard fan-out
+    sends the FPV stream to this laptop; the dashboard never sends anything back."""
+    def __init__(self, name, bind, local_port):
+        self.name, self.bind, self.local_port = name, bind, local_port
+        self.sock = None
+        self.lock = threading.Lock()
+        self.total = self.packets = self.last_packet = 0
+        self.error = ''
+        self.sender = None
+        self.thread = threading.Thread(target=self.run, daemon=True)
+
+    def disconnect(self):
+        with self.lock:
+            if self.sock:
+                self.sock.close()
+                self.sock = None
+
+    def snapshot(self):
+        age = time.monotonic()-self.last_packet if self.last_packet else None
+        return dict(name=self.name, receiving=age is not None and age < 3,
+                    age_seconds=round(age, 1) if age is not None else None,
+                    bytes=self.total, packets=self.packets, error=self.error,
+                    sender=self.sender)
+
+    def run(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as output:
+            while not STOP.is_set():
+                if not active():
+                    self.disconnect()
+                    STOP.wait(.5)
+                    continue
+                try:
+                    with self.lock:
+                        if self.sock is None:
+                            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                            try:
+                                # Never share or take packets from a pilot's socket.
+                                if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+                                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+                                sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 65536)
+                                sock.settimeout(1)
+                                sock.bind(self.bind)
+                            except OSError:
+                                sock.close()
+                                raise
+                            self.sock = sock
+                        sock = self.sock
+                    raw, peer = sock.recvfrom(2048)
+                    if not 12 <= len(raw) <= 2000 or raw[0] >> 6 != 2 or raw[1] & 127 != 96:
+                        continue
+                    output.sendto(raw, ('127.0.0.1', self.local_port))
+                    self.total += len(raw)
+                    self.packets += 1
+                    self.last_packet = time.monotonic()
+                    self.sender = peer[0]
+                    self.error = ''
+                except socket.timeout:
+                    continue
+                except OSError as exc:
+                    self.error = f'VPN video {self.bind[0]}:{self.bind[1]}: {exc}'
+                    self.disconnect()
+                    STOP.wait(3)
+
+
+class Observe:
+    """Reads one aircraft's observation tap over SSH into the shared store. It
+    runs the unprivileged /opt/cruza-observe-tap.py, which has no camera, FC,
+    MAVLink or route access, and it writes nothing back to the aircraft.
+
+    Records are tagged with this reader's own aircraft name, never with anything
+    the datagram claims, so one aircraft's observer cannot report as another.
+    Advisory only: these records never move an aircraft; the operator validates
+    them and any tasking stays in the preview panel."""
+    def __init__(self, name, host, alias, remote_port, user='ebach'):
+        self.name, self.host, self.alias = name, host, alias
+        self.remote_port, self.user = remote_port, user
+        self.proc = None
+        self.lock = threading.Lock()
+        self.error = ''
+        self.last_record = 0
+        self.records = 0
+        self.thread = threading.Thread(target=self.run, daemon=True)
+
+    def disconnect(self):
+        with self.lock:
+            if self.proc and self.proc.poll() is None:
+                self.proc.terminate()
+
+    def snapshot(self):
+        return dict(name=self.name, host=self.host,
+                    connected=time.monotonic()-self.last_record < 12,
+                    error=self.error, records=self.records)
+
+    def run(self):
+        while not STOP.is_set():
+            if not telemetry_active():
+                STOP.wait(.5)
+                continue
+            argv = ['ssh', '-T', '-i', str(KEY), '-o', 'IdentitiesOnly=yes',
+                    '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes',
+                    '-o', 'ConnectTimeout=6', '-o', 'ServerAliveInterval=5',
+                    '-o', 'ServerAliveCountMax=2', '-o', 'LogLevel=ERROR',
+                    '-o', 'HostKeyAlias='+self.alias, self.user+'@'+self.host,
+                    'python3 /opt/cruza-observe-tap.py --port '+str(self.remote_port)]
+            errors = deque(maxlen=2)
+            try:
+                with self.lock:
+                    self.proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                    proc = self.proc
+                def collect_errors():
+                    for line in iter(proc.stderr.readline, b''):
+                        errors.append(line.decode(errors='replace').strip()[:200])
+                reader = threading.Thread(target=collect_errors, daemon=True)
+                reader.start()
+                while not STOP.is_set() and telemetry_active():
+                    length = struct.unpack('!H', read_exact(proc.stdout, 2))[0]
+                    if not 2 <= length <= 512:
+                        raise ValueError('Invalid observation framing')
+                    raw = read_exact(proc.stdout, length)
+                    if observations.add(json.loads(raw), source=self.name):
+                        self.records += 1
+                    self.last_record = time.monotonic()
+                    self.error = ''
+            except (EOFError, OSError, ValueError, TypeError) as exc:
+                self.error = ' / '.join(errors) or str(exc)
+            finally:
+                self.disconnect()
+                if self.proc:
+                    try:
+                        self.proc.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        self.proc.kill()
+                        self.proc.wait(timeout=3)
+                    self.proc.stdout.close()
+                    self.proc.stderr.close()
+                    self.proc = None
+            STOP.wait(3)
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass
@@ -379,16 +537,32 @@ class Handler(BaseHTTPRequestHandler):
                 last_viewer = time.monotonic()
             if self.path in ('/status?watch=1','/status?watch=0'):
                 last_telemetry_viewer = time.monotonic()
+            fleet = [source.snapshot() for source in telemetry]
+            items = observations.snapshot()
+            readers = [o.snapshot() for o in observers]
             raw = json.dumps(dict(active=active(), media_running=media.poll() is None,
                                   feeds=[feed.snapshot() for feed in feeds],
-                                  fleet=[source.snapshot() for source in telemetry],
+                                  fleet=fleet,
+                                  # Kept flat for the existing areas-of-interest
+                                  # panel; `readers` and `swarm` are the fleet view.
+                                  observations=dict(
+                                      connected=any(r['connected'] for r in readers),
+                                      error='; '.join(f'{r["name"]}: {r["error"]}'
+                                                      for r in readers if r['error']),
+                                      items=items, readers=readers),
+                                  # One shared picture: each cue placed on the
+                                  # ground from its own aircraft's telemetry, and
+                                  # cues of one class from different aircraft
+                                  # correlated into a single area of interest.
+                                  # Advisory; nothing here is transmitted.
+                                  swarm=swarm.picture(items, fleet),
                                   controls={name: link.status() for name, link in controls.items()}),
                                   allow_nan=False).encode()
             content_type = 'application/json'
         elif path in ('/', '/index.html','/fleet.js','/ticker.js','/fleet.css','/fleet-map.js',
                       '/leaflet.js','/leaflet.css','/world.geojson','/us-states.geojson','/map-state.js',
                       '/alabama-map.js','/al-counties.geojson','/al-places.geojson','/al-roads.geojson',
-                      '/command-workflow.js'):
+                      '/command-workflow.js','/observations.js'):
             name = 'index.html' if path == '/' else path.lstrip('/')
             raw = (HERE/'dist'/name).read_bytes()
             content_type = {'js':'application/javascript','css':'text/css',
@@ -426,10 +600,13 @@ def supervisor():
         if not telemetry_active():
             for source in telemetry:
                 source.disconnect()
+            for reader in observers:
+                reader.disconnect()
+        observations.expire()
 
 
 def main():
-    global feeds, media, telemetry
+    global feeds, media, telemetry, observers
     exe = HERE/'runtime'/'mediamtx-v1.21.2'/'mediamtx.exe'
     if not exe.is_file() or not KEY.is_file():
         raise SystemExit('MediaMTX runtime or existing SSH key is missing. See README.')
@@ -448,8 +625,9 @@ def main():
     log_thread = threading.Thread(target=media_logs, daemon=True)
     log_thread.start()
     (HERE/'runtime'/'dashboard.pid').write_text(str(os.getpid()))
-    feeds = [Feed('cruza', '100.100.0.58', '10.229.125.15', 15600, 18000),
-             Feed('quadpi', '10.223.79.20', '10.223.79.20', 15601, 18002)]
+    feeds = [Feed('cruza', '100.100.0.34', '100.100.0.34', 15600, 18000, user='jbrascom'),
+             Feed('quadpi', '10.223.79.20', '10.223.79.20', 15601, 18002),
+             UdpFeed('rn03', ('0.0.0.0', 5603), 18004)]
     for feed in feeds:
         feed.thread.start()
     # Optional click-to-fly link; when enabled it also supplies quadpi telemetry.
@@ -471,7 +649,7 @@ def main():
         tfw = controls['rn03'] = QuadControl(parse_target(os.environ['DASHBOARD_TFW_CONTROL']),
                               HERE/'runtime'/'tfw-commands.log', telemetry_active,
                               LIMITS['rn03'], STOP, name='rn03', title='TFW drone')
-    telemetry = [Telemetry('cruza','100.100.0.58','10.229.125.15',15610),
+    telemetry = [Telemetry('cruza','100.100.0.34','100.100.0.34',15610,user='jbrascom'),
                  control or Telemetry('quadpi','10.223.79.20','10.223.79.20',15611),
                  tfw or DirectTelemetry('rn03','100.100.0.6',5760)]
     for source in telemetry:
@@ -479,6 +657,14 @@ def main():
             source.start()
         else:
             source.thread.start()
+    # One observation reader per aircraft with the tap installed. Advisory areas
+    # of interest only; they share the telemetry viewer lease and never write to
+    # an aircraft. Records are tagged with the reader's aircraft, so the shared
+    # picture can tell which platform saw what and correlate the overlaps.
+    observers = [Observe(name, host, host, port, user=user)
+                 for name, host, user, port in OBSERVE_SOURCES]
+    for reader in observers:
+        reader.thread.start()
     threading.Thread(target=supervisor, daemon=True).start()
     def stop(*_):
         STOP.set()

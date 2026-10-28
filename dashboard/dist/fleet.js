@@ -20,7 +20,7 @@ for (const [id, [name, route]] of Object.entries(names)) {
   card.innerHTML = '<div class="head"><div><h2></h2><small></small></div><span class="badge">WAITING</span></div>';
   card.querySelector('h2').textContent = name;
   card.querySelector('small').textContent = route;
-  const videoConfigured = id !== 'rn03';
+  const videoConfigured = true;
   card.innerHTML += `
     <div class="video">
       ${videoConfigured ? '<iframe allow="autoplay; fullscreen; picture-in-picture"></iframe><div class="overlay" hidden>Video paused</div>' : '<div class="video-empty">Video not configured</div>'}
@@ -334,6 +334,7 @@ async function tick() {
     renderBanner(status.fleet);
     drawMap(status.fleet);
     document.dispatchEvent(new CustomEvent('fleet-status', {detail: status}));
+    window.observations?.update(status.observations, status.fleet, status.swarm);
     for (const f of status.feeds) {
       const prev = previous[f.name];
       const rate = prev ? Math.round(Math.max(0, f.bytes - prev.bytes) * 8 / (now - prev.time)) : 0;

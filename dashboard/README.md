@@ -736,3 +736,39 @@ Validation: 29 Python decoder/session/TCP-reader checks and the map checks
 passed. Browser checks verified equal card widths, aligned camera areas and the
 larger full-width map. TFW drone's heartbeat, position, battery and mission
 status were verified live; this does not establish flight readiness.
+
+## Areas of interest (observer cues) — 23 October 2026
+
+The dashboard now shows advisory areas of interest from the Cruza observer, so
+the operator can cue an agile mesh platform (quadpi, TFW drone) to go look. The
+chain is deliberately human-gated end to end:
+
+1. The Cruza `observe.py` detector publishes advisory detections (angles off the
+   camera boresight) over a loopback tap. `server.py` reads them over SSH into a
+   validated, expiring `ObservationStore` (`observations.py`) and exposes them in
+   `/status` as `observations`. The reader shares the telemetry viewer lease and
+   writes nothing to the aircraft.
+2. `observations.js` joins each detection with the Cruza's live telemetry
+   (heading, pitch, relative altitude) to estimate a bearing and a rough ground
+   point, and lists it in the **Areas of interest** panel with class, confidence,
+   bearing, estimated range and age.
+3. The operator **Confirms** or **Dismisses** each cue. A confirmed cue draws an
+   advisory marker on the map and can be **Sent to dispatch**, which drops a
+   candidate point into the existing command-workflow panel.
+4. Tasking stays exactly as before: **preview only**. Nothing is transmitted to
+   any aircraft, and no detection ever moves one.
+
+The camera mount assumptions used for bearing/range (`MOUNT_YAW_DEG`,
+`MOUNT_PITCH_DOWN_DEG`) are constants at the top of `dist/observations.js`; the
+field of view lives in the Pi observer config. These are cueing estimates, not a
+calibrated sensor line — measure them on the airframe and correct them, and
+treat an estimated location as a starting point to re-pick on the map.
+
+Validation decisions (confirm/dismiss) are local to the page and are discarded on
+reload, like the command preview. Observation records are validated and clamped
+before display; malformed or non-finite fields are dropped. Nine extra decoder
+tests cover this (`test_observations.py`). No observation is written to disk.
+
+The feature is inert until the Cruza detector is enabled on the Pi (see the
+companion README). With the detector off, the panel simply reports the observer
+as not connected.
