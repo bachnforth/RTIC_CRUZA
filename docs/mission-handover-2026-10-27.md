@@ -131,6 +131,8 @@ Tailscale/LTE): after the fixes in
 person detections became handover requests with real image chips (5–6 KB),
 and approve (H4, to TFW drone) and deny (H3) were logged. Positions were
 "estimated" because a camera on the ground gives no range.
+On 29 Oct the corrected crop was checked: a person standing off to one side of
+the frame came out centred in the card's picture.
 
 Not yet verified: chips in flight, positions from a flying Cruza, a handover
 sent over a real live link.

@@ -25,9 +25,11 @@ controller, its parameters and arming were not touched.
 Verified on the bench the same evening: steady telemetry (heartbeat < 1 s,
 GPS fix, 25+ satellites), video to the dashboard, person detections becoming
 handover requests, and a real 5.6 KB picture of the person on the card.
-**Not yet verified:** that the corrected crop (item 5's
-`convert_inference_coords` mapping) is centred on a real detection, and any of
-it in flight.
+On 29 Oct, after a reboot, all five changes were still in place, and the
+corrected crop (item 5's `convert_inference_coords` mapping) was checked with a
+real detection: the person stood off to one side of the frame, and the 4 KB
+picture on the card showed them centred, head to feet. **Not yet verified:**
+any of it in flight.
 
 ## Required actions for you
 
