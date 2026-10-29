@@ -248,6 +248,26 @@
     }
     render();
   });
+  // Used by the mission handover panel after an approval: selects the aircraft
+  // and command and drops the approved point. The operator still sets the
+  // altitude, reviews and sends; nothing is transmitted from here.
+  window.commandWorkflow = {
+    prefill(target, actionId, point, note) {
+      if (!controls[target]) return false;
+      platform.value = target;
+      platform.onchange();
+      if ([...command.options].some(o => o.value === actionId)) command.value = actionId;
+      command.onchange();
+      window.fleetMap.setCandidate(point.latitude, point.longitude);
+      const drawer = panel.closest('details');
+      if (drawer) drawer.open = true;
+      result.className = '';
+      result.textContent = note;
+      panel.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+      altitude.focus({preventScroll: true});
+      return true;
+    },
+  };
   fillPlatforms();
   render();
 })();

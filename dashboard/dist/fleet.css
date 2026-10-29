@@ -115,3 +115,35 @@
 .aoi-actions button{padding:6px 10px;font-size:11px}
 .aoi-actions .aoi-dismiss{border-color:#5a4a4a;color:#e0c7c7}
 .aoi-pin{display:grid;place-items:center;color:#8ce7c9;font-size:20px;text-shadow:0 0 4px #0a1017,0 0 2px #0a1017}
+/* Mission handover (operator approve/deny of observer cues) */
+.handover-drawer{margin-top:14px;border-top:1px solid #385466;padding-top:12px}
+.handover-drawer>summary{cursor:pointer;font-size:13px;color:#c6d8e3}
+#handover-badge{color:#8ce7c9;font-size:10px;letter-spacing:1px;margin-left:12px}#handover-badge.ho-badge-pending{color:#ffd479}
+.handover-panel{margin-top:12px;display:grid;gap:8px}
+#handover-status{color:#9bcdbb;margin:0}
+.handover-list{list-style:none;margin:0;padding:0;display:grid;gap:10px;max-height:520px;overflow:auto}
+.ho{display:grid;grid-template-columns:160px 1fr;gap:12px;background:#0d1720;border:1px solid #2c4556;border-radius:6px;padding:10px 12px}
+.ho-pending{border-color:#ffd479;box-shadow:0 0 0 1px #ffd47955}.ho-approved{border-color:#7ce1ba}.ho-denied,.ho-expired{opacity:.6}
+.ho-figure{display:grid;place-items:center;min-height:110px;background:#071017;border:1px solid #22384a;border-radius:4px;overflow:hidden}
+.ho-figure img{width:100%;height:auto;display:block;image-rendering:auto}.ho-figure [hidden]{display:none}
+.ho-noimage{font-size:11px;color:#7f97aa;padding:8px;text-align:center}
+.ho-body{display:grid;gap:6px;min-width:0}
+.ho-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}.ho-head strong{font-size:14px;text-transform:capitalize}
+.ho-state{margin-left:auto;font-size:10px;letter-spacing:1px;color:#ffd479}.ho-approved .ho-state{color:#7ce1ba}.ho-denied .ho-state,.ho-expired .ho-state{color:#c9a8a8}
+.ho-detail{margin:0;font-size:11px;color:#9bb1c1;line-height:1.5;overflow-wrap:anywhere}
+.ho-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ho-actions button,.ho-actions select{padding:6px 10px;font-size:11px}
+.ho-approve:not(:disabled){border-color:#7ce1ba;color:#7ce1ba}.ho-deny{border-color:#5a4a4a;color:#e0c7c7}
+.ho-message{margin:0;font-size:11px;min-height:14px;color:#c6d8e3}.ho-message.ok{color:#7ce1ba}.ho-message.failed{color:#ff9a7a}
+@media (max-width:560px){.ho{grid-template-columns:1fr}}
+.handover-pin{display:grid;place-items:center;color:#ffd479;font-size:22px;text-shadow:0 0 4px #0a1017,0 0 2px #0a1017}
+.ho-decision-only .ho-state{color:#ffd479}.ho-coords{font-variant-numeric:tabular-nums;color:#ffd479;font-size:12px;margin:0}
+/* Mission handover takes over the top of the page while a request awaits a decision. */
+.handover-drawer.handover-takeover{margin:0 0 16px;border:2px solid #ffd479;border-radius:8px;padding:14px 16px;background:#141c12;box-shadow:0 0 0 4px rgba(255,212,121,.15)}
+.handover-takeover>summary{font-size:18px;font-weight:700;color:#ffd479}
+.handover-takeover #handover-badge{font-size:14px;animation:ho-pulse 1.4s ease-in-out infinite}
+.handover-takeover .handover-list{max-height:none}
+.handover-takeover .ho{grid-template-columns:240px 1fr}
+.handover-takeover .ho img{width:100%}
+@keyframes ho-pulse{50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.handover-takeover #handover-badge{animation:none}}
+@media (max-width:560px){.handover-takeover .ho{grid-template-columns:1fr}}

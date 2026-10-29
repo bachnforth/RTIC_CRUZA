@@ -117,5 +117,10 @@ document.addEventListener('fleet-preview-platform',event=>{selectedPlatform=even
 let route=null,routeKey='';
 function showRoute(points,home){const key=JSON.stringify([points,home]);if(key===routeKey)return;clearRoute();routeKey=key;const line=home?[home,...points]:points;if(line.length<2)return;route=L.layerGroup([L.polyline(line,{color:'#ffd68a',weight:2,dashArray:'6 5',interactive:false}),...points.slice(0,1).map(p=>L.circleMarker(p,{radius:5,color:'#ffd68a',fillOpacity:1,interactive:false}).bindTooltip('Mission start',{direction:'top'}))]).addTo(map);route.getLayers()[0].bindTooltip('Loaded mission (read from aircraft)',{sticky:true});}
 function clearRoute(){if(route){map.removeLayer(route);route=null;}routeKey='';}
-window.fleetMap={update:fleet=>{update(fleet);highlightPlatform();},startPick,clearCandidate,cancelPick,showRoute,clearRoute,setCandidate,setAOIs};
+// Approved decision-only handover points: recorded for the safety pilot, never a
+// command destination, so they stay apart from the workflow's selected point.
+const handoverLayer=L.layerGroup().addTo(map);let handoverKey='';
+function showHandovers(list){const key=JSON.stringify(list);if(key===handoverKey)return;handoverKey=key;handoverLayer.clearLayers();for(const h of list){if(!Number.isFinite(h.lat)||!Number.isFinite(h.lon))continue;L.marker([h.lat,h.lon],{keyboard:false,interactive:false,icon:L.divIcon({className:'handover-pin',html:'<span>◎</span>',iconSize:[30,30],iconAnchor:[15,15]})}).bindTooltip(h.label,{permanent:true,direction:'bottom'}).addTo(handoverLayer);}}
+function focusPoint(lat,lon){if(!Number.isFinite(lat)||!Number.isFinite(lon))return;follow.checked=false;overviewMode=false;map.setView([lat,lon],Math.max(map.getZoom(),16),{animate:false});}
+window.fleetMap={update:fleet=>{update(fleet);highlightPlatform();},startPick,clearCandidate,cancelPick,showRoute,clearRoute,setCandidate,setAOIs,showHandovers,focusPoint};
 })();

@@ -18,6 +18,8 @@ import time
 import swarm
 from fleet import Limits, VehicleState
 from control import BenchControl, QuadControl, parse_target
+from handover import HandoverQueue
+from handover_intake import Intake
 from observations import ObservationStore
 
 # Alert thresholds. Cruza's values copy its own flight-controller settings
@@ -40,14 +42,20 @@ OBSERVE_SOURCES = [('cruza', '100.100.0.34', 'jbrascom', 15620),
 HERE = Path(__file__).resolve().parent
 IMAGERY = HERE/'runtime'/'imagery'
 IMAGERY_PATH = re.compile(r'/imagery/(manifest\.json|\d{1,2}/\d{1,7}/\d{1,7})')
-KEY = Path.home()/'.ssh'/'id_ed25519_pi'
+# The two operators' laptops name the same-purpose key differently.
+KEY = next((k for k in (Path.home()/'.ssh'/'id_ed25519_pi', Path.home()/'.ssh'/'id_ed25519_rpi')
+            if k.is_file()), Path.home()/'.ssh'/'id_ed25519_pi')
 STOP = threading.Event()
 last_viewer = 0
 last_telemetry_viewer = 0
 feeds = []
 telemetry = []
 observers = []
-observations = ObservationStore()
+# Intake passes detections to the store unchanged and keeps the image chips
+# that accompany them for the mission handover queue (handover_intake.py).
+observations = Intake(ObservationStore())
+handovers = HandoverQueue(HERE/'runtime'/'handover.log', HERE/'runtime'/'handover')
+HANDOVER_IMAGE = re.compile(r'/handover-image/H[0-9]{1,6}')
 media = None
 controls = {}   # platform name -> live control link (quadpi, rn03 = TFW drone)
 ORIGINS = ('http://127.0.0.1:8765', 'http://localhost:8765')
@@ -480,13 +488,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global last_viewer
-        if (self.path not in ('/pause', '/shutdown', '/control') or self.headers.get('Host') not in ('127.0.0.1:8765', 'localhost:8765')
+        if (self.path not in ('/pause', '/shutdown', '/control', '/handover') or self.headers.get('Host') not in ('127.0.0.1:8765', 'localhost:8765')
             or self.headers.get('Origin') not in ORIGINS
             or self.headers.get('Sec-Fetch-Site', 'same-origin') != 'same-origin'):
             self.send_error(403)
             return
         if self.path == '/control':
             self.handle_control()
+            return
+        if self.path == '/handover':
+            self.handle_handover()
             return
         last_viewer = 0
         for feed in feeds:
@@ -520,6 +531,37 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
+    def handle_handover(self):
+        # Approve or deny one handover request. Nothing is sent to an aircraft:
+        # approval only records the decision; the command workflow still sends.
+        length = int(self.headers.get('Content-Length') or 0)
+        if self.headers.get('Content-Type') != 'application/json' or not 0 < length <= 512:
+            self.send_error(400)
+            return
+        try:
+            body = json.loads(self.rfile.read(length))
+        except ValueError:
+            self.send_error(400)
+            return
+        if not isinstance(body, dict):
+            self.send_error(400)
+            return
+        ok, message, request = handovers.decide(body.get('id'), body.get('decision'),
+                                                target=body.get('target'),
+                                                reason=body.get('reason', ''),
+                                                # Only links that take a point command;
+                                                # the bench link (arm/disarm) does not.
+                                                live=tuple(name for name, link in controls.items()
+                                                           if {'goto', 'loiter'} & {a['id'] for a in link.actions}),
+                                                action=body.get('action', 'goto'))
+        raw = json.dumps(dict(ok=ok, message=message, request=request), allow_nan=False).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(raw)))
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(raw)
+
     def do_GET(self):
         global last_viewer, last_telemetry_viewer
         # Reject DNS rebinding and foreign sites attempting to start LTE copies.
@@ -540,6 +582,9 @@ class Handler(BaseHTTPRequestHandler):
             fleet = [source.snapshot() for source in telemetry]
             items = observations.snapshot()
             readers = [o.snapshot() for o in observers]
+            picture = swarm.picture(items, fleet)
+            # Images come from the Intake wrapper; a plain store (as in tests) has none.
+            handovers.sync(picture['cues'], getattr(observations, 'image_for', None))
             raw = json.dumps(dict(active=active(), media_running=media.poll() is None,
                                   feeds=[feed.snapshot() for feed in feeds],
                                   fleet=fleet,
@@ -555,18 +600,30 @@ class Handler(BaseHTTPRequestHandler):
                                   # cues of one class from different aircraft
                                   # correlated into a single area of interest.
                                   # Advisory; nothing here is transmitted.
-                                  swarm=swarm.picture(items, fleet),
+                                  swarm=picture,
+                                  # Requests to hand a cue to a live aircraft;
+                                  # approval is recorded here, never transmitted.
+                                  handover=handovers.snapshot(),
                                   controls={name: link.status() for name, link in controls.items()}),
                                   allow_nan=False).encode()
             content_type = 'application/json'
         elif path in ('/', '/index.html','/fleet.js','/ticker.js','/fleet.css','/fleet-map.js',
                       '/leaflet.js','/leaflet.css','/world.geojson','/us-states.geojson','/map-state.js',
                       '/alabama-map.js','/al-counties.geojson','/al-places.geojson','/al-roads.geojson',
-                      '/command-workflow.js','/observations.js'):
+                      '/command-workflow.js','/observations.js','/handover.js'):
             name = 'index.html' if path == '/' else path.lstrip('/')
             raw = (HERE/'dist'/name).read_bytes()
             content_type = {'js':'application/javascript','css':'text/css',
                             'geojson':'application/geo+json'}.get(name.rsplit('.',1)[-1], 'text/html; charset=utf-8')
+        elif HANDOVER_IMAGE.fullmatch(path):
+            if self.headers.get('Sec-Fetch-Site', 'same-origin') not in ('same-origin', 'none'):
+                self.send_error(403)
+                return
+            raw = handovers.image(path.rsplit('/', 1)[1])
+            if raw is None:
+                self.send_error(404)
+                return
+            content_type = 'image/jpeg'
         elif IMAGERY_PATH.fullmatch(path):
             # Offline field imagery saved by download-imagery.py; the strict
             # pattern above keeps requests inside runtime/imagery/.

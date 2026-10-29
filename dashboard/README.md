@@ -1,5 +1,34 @@
 # Cruza / RTIC fleet dashboard
 
+## Mission handover (27–28 October 2026) — tested with the real Cruza on the ground, not yet in flight
+
+The **Mission handover** panel is hidden until a request exists; while one awaits a decision it moves above the map. It lists each geolocated
+observer cue with its image chip, class, confidence, estimated position and
+range, and how recently it was seen. The operator **approves** it for quadpi
+or TFW drone (and picks Fly to point & hold or Loiter) or **denies** it with
+an optional reason. Approval transmits nothing:
+
+- If that aircraft's control link takes a point command (`-QuadControl` /
+  `-TfwControl`), approval prefills its command workflow at the approved point;
+  the altitude, review and Send are still the operator's.
+- Otherwise (no control link, or the arm/disarm-only `-QuadBench` link) it is
+  **decision only**. The decision is recorded and the approved point is marked
+  ◎ on the map, separately from the workflow's selected point, with Show point
+  and Copy coordinates for the safety pilot. No command path exists.
+
+Approval is refused when the position is over 60 s old.
+
+The queue lives on the server (`handover.py`), so all open pages agree.
+Same-class cues within 120 m merge into one request, and a decided request is
+not offered again for 5 minutes. Decisions and expiries go to
+`runtime/handover.log` with the image saved under `runtime/handover/`.
+Images arrive as numbered chip parts inside the taps' existing 512-byte
+records (`handover_intake.py`; the observation store and taps are unchanged).
+Sending them from the Cruza is a proposal for its owner in
+`docs/proposals/cruza-image-chips/`; without it, cards show location only. The message format,
+the bench run and a known placement issue in `swarm.picture()` are in
+[docs/mission-handover-2026-10-27.md](../docs/mission-handover-2026-10-27.md).
+
 ## Command workflow (21 October 2026)
 
 Below the map, one **Command workflow** serves every aircraft: 1 · choose a
