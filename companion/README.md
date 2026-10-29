@@ -92,7 +92,10 @@ flowchart LR
     `0.0.0.0:5600` where that app version exposes it). Enable low latency if
     available. Start a session with `sudo systemctl start cruza-video`, stop
     with `sudo systemctl stop cruza-video`. Boot startup is opt-in; see
-    [automatic video startup](../docs/video-autostart.md). If the
+    [automatic video startup](../docs/video-autostart.md). On the reflashed
+    aircraft `cruza-stream` provides video instead and owns the camera; the two
+    units conflict, so use one or the other (see
+    [combined video + observation](#combined-video--observation-cruza-stream)). If the
     installed Android build lacks the source/decoder, record exact version
     and diagnose; desktop documentation alone is not proof of compatibility.
 
@@ -225,7 +228,51 @@ logout and service/package removal are separate deliberate rollback steps;
 do not remove a previously existing installation. Installed dependencies are
 recorded in packages.tsv, not automatically uninstalled.
 
+## Combined video + observation (`cruza-stream`)
+
+The IMX500 is one AI camera and only one process can own it. `stream.py`
+(`cruza-stream.service`, installed as `/opt/cruza/stream.py`) therefore does
+both jobs from a single picamera2 capture: it H264-encodes the main stream and
+fans it out over RTP to every configured phone plus the dashboard's loopback
+mirror, and it reads the on-sensor inference metadata from the same frames to
+publish the advisory detection records described below.
+
+It replaces both single-purpose camera services. `cruza-video` (rpicam) and
+`cruza-observe` now declare `Conflicts=cruza-stream.service`, so starting either
+one stops `cruza-stream` deliberately rather than racing it for the camera —
+that race is what cost video and detections at every boot before 28 October
+2026. `enable-video-autostart.sh` and `deploy-observe.sh` both refuse to run
+while `cruza-stream` is enabled or active, and name the one command that stands
+it down. Enable exactly one camera service.
+
+### Image chips for handover review
+
+Off by default. With `"chips": true` under `observe` in the config, each
+detection record is followed by a small JPEG of the detection — the box plus a
+margin — so the dashboard's handover card has a picture the operator can judge
+before approving anything. `chip_seconds` (2..600, default 10) is the minimum
+gap between chips *per class*, not per frame.
+
+The picture is sent as numbered parts on the same loopback port as the records,
+each part its own datagram inside the existing 512-byte cap:
+
+```json
+{"t": 1793150000.12, "chip": 93, "part": 0, "parts": 9, "jpg": "<base64, <=400 chars>"}
+```
+
+`chip` is the `seq` of the detection record the picture shows, so the deployed
+`observe-tap.py` and the laptop's reader are unchanged. At most 64 parts
+(~19 KB of JPEG); the laptop discards anything larger, malformed, or whose parts
+do not all arrive within 15 s. Quality is dropped (70, 50, 35) until the chip
+fits. The chip code catches its own errors — a failure is logged as
+`chip_error` and can never stop video or detections. Successful chips log
+`chip_sent`. Still advisory: a picture moves no aircraft.
+
 ## Observation detector (areas of interest) — 23 October 2026
+
+Superseded by `cruza-stream` above, which publishes the same records alongside
+video; this is the older camera-only detector, kept for a Pi without the
+combined service. Do not enable it and `cruza-stream` together.
 
 Optional, opt-in, camera-only. `observe.py` runs on-sensor object detection on
 the IMX500 and publishes small advisory JSON records ("an in-scope object is in
@@ -266,7 +313,7 @@ Bench self-test without the camera (emits canned records to the loopback port,
 clearly marked, never a live detection):
 
 ```sh
-sudo -u ebach python3 /opt/cruza/observe.py --synthetic 8
+sudo -u jbrascom python3 /opt/cruza/observe.py --synthetic 8
 ```
 
 Rollback: `sudo systemctl disable --now cruza-observe.service`, remove

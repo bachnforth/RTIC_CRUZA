@@ -4,6 +4,10 @@ After=network-online.target tailscaled.service cruza-firewall.service
 Wants=network-online.target tailscaled.service
 # Camera-only. Streams H264/RTP to the configured phones and publishes advisory
 # detection records. No FC, MAVLink, route or modem access.
+# Only one process can own the IMX500: the older single-purpose camera services
+# raced this one at every boot, which cost video and detections. Declaring the
+# conflict means systemd stops them instead of letting both grab the camera.
+Conflicts=cruza-observe.service cruza-video.service
 StartLimitIntervalSec=300
 StartLimitBurst=3
 

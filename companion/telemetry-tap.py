@@ -17,8 +17,8 @@ import time
 
 IDS = {0, 1, 24, 30, 33, 42, 46, 74, 147, 242, 245, 253}
 # STATUSTEXT (253) carries the autopilot's warnings. Each one is a different
-# message, so it bypasses the per-type 0.5 s thinning but is capped at
-# TEXT_BURST messages per TEXT_WINDOW seconds.
+# message, so it bypasses the per-sender, per-type 0.5 s thinning but is capped
+# at TEXT_BURST messages per TEXT_WINDOW seconds.
 STATUSTEXT, TEXT_BURST, TEXT_WINDOW = 253, 20, 10
 SOURCES = {'cruza': ('tailscale0', '100.100.0.58', 14560),
            'quadpi': ('eth0', '10.223.79.20', 14551)}
@@ -53,6 +53,11 @@ def mav_frames(payload):
         if mid in IDS:
             yield mid, payload[pos:pos+length]
         pos += length
+
+
+def sender(raw):
+    """(sysid, compid) of a frame: v2 (0xFD) carries them at 5:7, v1 at 3:5."""
+    return raw[5:7] if raw[0] == 253 else raw[3:5]
 
 
 def main():
@@ -121,9 +126,11 @@ def main():
                     if len(texts) < TEXT_BURST:
                         texts.append(now)
                         emit({'frame': raw.hex()})
-                elif now-last.get(mid, -100) >= .5:
+                # Thin per sender as well as per type: a phone GCS heartbeat
+                # must not crowd out the autopilot's own heartbeat.
+                elif now-last.get(key := (mid, sender(raw)), -100) >= .5:
                     emit({'frame': raw.hex()})
-                    last[mid] = now
+                    last[key] = now
 
 
 if __name__ == '__main__':

@@ -14,6 +14,7 @@ configured Tailscale phones; it has no serial, MAVLink, route or modem access an
 issues no flight command. Advisory only: records never move an aircraft.
 """
 import argparse
+import base64
 import datetime as dt
 import json
 import re
@@ -67,9 +68,18 @@ def load_config(path):
     hfov = float(o.get("hfov_deg", 66.0))
     vfov = float(o.get("vfov_deg", 49.0))
     classes = {x.lower() for x in o.get("classes", []) if isinstance(x, str)}
+    # Optional image chips for the dashboard's handover review (off by default).
+    chips = o.get("chips", False)
+    if not isinstance(chips, bool):
+        raise ValueError("observe.chips must be true or false")
+    chip_seconds = o.get("chip_seconds", 10.0)
+    if isinstance(chip_seconds, bool) or not isinstance(chip_seconds, (int, float)) \
+            or not 2 <= chip_seconds <= 600:
+        raise ValueError("observe.chip_seconds must be 2..600")
     return dict(profile=c["video_profile"], video_port=c["video_port"], mirror=mirror,
                 dests=dests, model=model, port=port, min_score=min_score,
-                max_rate=max_rate, repeat=repeat, hfov=hfov, vfov=vfov, classes=classes)
+                max_rate=max_rate, repeat=repeat, hfov=hfov, vfov=vfov, classes=classes,
+                chips=chips, chip_seconds=float(chip_seconds))
 
 
 def emit_log(event, **fields):
@@ -100,10 +110,88 @@ class Publisher:
                 self.sock.sendto(data, self.addr)
             except OSError:
                 pass
+        return self.seq
+
+    def send_chip(self, seq, jpeg):
+        """Send one JPEG as numbered parts naming detection `seq`, each its own
+        datagram under the tap's 512-byte cap:
+        {"t": .., "chip": seq, "part": i, "parts": n, "jpg": "<base64>"}"""
+        text = base64.b64encode(jpeg).decode()
+        chunks = [text[i:i + CHIP_PART_CHARS] for i in range(0, len(text), CHIP_PART_CHARS)]
+        if len(chunks) > CHIP_MAX_PARTS:
+            return False
+        t = round(time.time(), 2)
+        for i, chunk in enumerate(chunks):
+            data = json.dumps({"t": t, "chip": seq, "part": i, "parts": len(chunks),
+                               "jpg": chunk}).encode()
+            try:
+                self.sock.sendto(data, self.addr)
+            except OSError:
+                return False
+            time.sleep(0.003)  # stay well inside the tap's 32 KB receive buffer
+        return True
+
+
+# Image chip limits; the laptop discards anything outside them.
+CHIP_PART_CHARS = 400      # base64 characters per part (multiple of 4)
+CHIP_MAX_PARTS = 64        # so at most 19200 bytes of JPEG
+CHIP_TARGET = 240          # longest side of the chip, pixels
+CHIP_QUALITY = 70
 
 
 def clamp01(v):
     return 0.0 if v < 0 else 1.0 if v > 1 else float(v)
+
+
+def chip_jpeg(frame, size, bbox, margin=0.5):
+    """JPEG of the box (normalised x, y, w, h) plus a margin, cut from a main
+    stream frame: 4-channel XBGR8888 ([R, G, B, X] per pixel), 3-channel, or
+    YUV420 of `size` (w, h). Returns bytes or None. A picture for the operator,
+    not a measurement; the box is in the network's input space, and the margin
+    covers the small offset from the main stream's framing."""
+    import numpy as np
+    import simplejpeg  # picamera2 dependency
+    x, y, bw, bh = bbox
+    cx, cy = x + bw / 2, y + bh / 2
+    half_w = max(bw * (1 + margin), 0.15) / 2
+    half_h = max(bh * (1 + margin), 0.15) / 2
+    if frame.ndim == 3:
+        h, w, channels = frame.shape
+        x0, x1 = int(clamp01(cx - half_w) * w), int(clamp01(cx + half_w) * w)
+        y0, y1 = int(clamp01(cy - half_h) * h), int(clamp01(cy + half_h) * h)
+        if x1 - x0 < 8 or y1 - y0 < 8:
+            return None
+        step = max(1, -(-max(x1 - x0, y1 - y0) // CHIP_TARGET))
+        crop = np.ascontiguousarray(frame[y0:y1:step, x0:x1:step])
+        colorspace = {4: "RGBX", 3: "RGB"}.get(channels)
+        if colorspace is None:
+            return None
+        for quality in (CHIP_QUALITY, 50, 35):
+            jpeg = simplejpeg.encode_jpeg(crop, quality=quality, colorspace=colorspace)
+            if len(base64.b64encode(jpeg)) <= CHIP_PART_CHARS * CHIP_MAX_PARTS:
+                return jpeg
+        return None
+    w, h = size
+    stride = frame.shape[1]
+    y_plane = frame[:h, :w]
+    uv = frame[h:h + h // 2].reshape(-1)
+    u_plane = uv[:(h // 2) * (stride // 2)].reshape(h // 2, stride // 2)[:, :w // 2]
+    v_plane = uv[(h // 2) * (stride // 2):].reshape(h // 2, stride // 2)[:, :w // 2]
+    x0, x1 = int(clamp01(cx - half_w) * w) // 2, int(clamp01(cx + half_w) * w) // 2
+    y0, y1 = int(clamp01(cy - half_h) * h) // 2, int(clamp01(cy + half_h) * h) // 2
+    if x1 - x0 < 4 or y1 - y0 < 4:
+        return None
+    # Work in chroma (half-resolution) units so the planes stay 2:1.
+    step = max(1, -(-max(x1 - x0, y1 - y0) * 2 // CHIP_TARGET))
+    for quality in (CHIP_QUALITY, 50, 35):
+        u = np.ascontiguousarray(u_plane[y0:y1:step, x0:x1:step])
+        v = np.ascontiguousarray(v_plane[y0:y1:step, x0:x1:step])
+        ys = y_plane[2 * y0:2 * y1, 2 * x0:2 * x1][::step, ::step]
+        ys = np.ascontiguousarray(ys[:2 * u.shape[0], :2 * u.shape[1]])
+        jpeg = simplejpeg.encode_jpeg_yuv_planes(ys, u, v, quality=quality)
+        if len(base64.b64encode(jpeg)) <= CHIP_PART_CHARS * CHIP_MAX_PARTS:
+            return jpeg
+    return None
 
 
 def detections(np_outputs, intr):
@@ -167,10 +255,16 @@ def run(cfg):
     except Exception:  # noqa: BLE001 - older encoders lack these knobs
         pass
 
+    # The third positional argument of start_recording is pts, not the camera
+    # configuration, so this config is ignored and the camera runs its own
+    # default (1280x720 XBGR8888 on the Cruza, seen in chip_error logs).
+    # config=config would honour the profile size and give the encoder much less
+    # to do, but the measured hfov_deg/vfov_deg describe the stream as it runs
+    # today: re-measure the field of view before changing this.
     picam2.start_recording(encoder, FileOutput(gst.stdin), config)
     emit_log("stream_start", profile=cfg["profile"], bitrate=bitrate,
              dests=cfg["dests"], video_port=cfg["video_port"], port=cfg["port"],
-             classes=sorted(cfg["classes"]) or "all")
+             classes=sorted(cfg["classes"]) or "all", chips=cfg["chips"])
 
     pub = Publisher(cfg["port"])
     running = {"on": True}
@@ -180,6 +274,7 @@ def run(cfg):
     min_interval = 1.0 / cfg["max_rate"]
     last_emit = 0.0
     last_seen = {}
+    last_chip = {}  # class name -> monotonic time of its last image chip
     try:
         while running["on"]:
             metadata = picam2.capture_metadata()
@@ -212,7 +307,35 @@ def run(cfg):
             last_seen[name] = now
             last_emit = now
             cx, cy = bbox[0] + bbox[2] / 2, bbox[1] + bbox[3] / 2
-            pub.send(name, score, cx, cy, bbox, cfg["hfov"], cfg["vfov"])
+            seq = pub.send(name, score, cx, cy, bbox, cfg["hfov"], cfg["vfov"])
+            if cfg["chips"] and now - last_chip.get(name, -1e9) >= cfg["chip_seconds"]:
+                # The next frame, not the one inference ran on (~1 frame later);
+                # fine for a picture for the operator.
+                frame = None
+                try:
+                    # The box is in the network's (whole-sensor) space; map it
+                    # into the main stream, which is a 16:9 cut of the sensor.
+                    main_size = picam2.camera_configuration()["main"]["size"]
+                    try:
+                        bx, by, bw_, bh_ = bbox
+                        px, py, pw, ph = imx500.convert_inference_coords(
+                            (by, bx, by + bh_, bx + bw_), metadata, picam2)
+                        mw, mh = main_size
+                        chip_box = [px / mw, py / mh, pw / mw, ph / mh]
+                    except Exception:  # noqa: BLE001 - fall back to the raw box
+                        chip_box = bbox
+                    frame = picam2.capture_array("main")
+                    # The configured size is not always what the camera gives
+                    # (see stream.py's start_recording note), so ask the camera.
+                    jpeg = chip_jpeg(frame, main_size, chip_box)
+                except Exception as error:  # noqa: BLE001 - a picture must never stop video or detection
+                    emit_log("chip_error", detail=str(error)[:200],
+                             shape=list(getattr(frame, "shape", [])),
+                             main=str(picam2.camera_configuration().get("main"))[:300])
+                    jpeg = None
+                if jpeg and pub.send_chip(seq, jpeg):
+                    last_chip[name] = now
+                    emit_log("chip_sent", cls=name, seq=seq, bytes=len(jpeg))
     finally:
         try:
             picam2.stop_recording()

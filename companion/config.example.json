@@ -4,6 +4,7 @@
   "android_ip": "",
   "mavlink_port": 14560,
   "video_port": 5600,
+  "video_mirror_port": 15600,
   "video_profile": "economy",
   "video_max_seconds": 1800,
   "lte_connection": "cruza-lte",
@@ -18,6 +19,8 @@
     "repeat_seconds": 3.0,
     "hfov_deg": 66.0,
     "vfov_deg": 49.0,
+    "chips": false,
+    "chip_seconds": 10.0,
     "classes": ["person", "bicycle", "car", "motorcycle", "bus", "truck", "boat", "airplane"]
   }
 }

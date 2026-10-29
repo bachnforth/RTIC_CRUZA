@@ -9,6 +9,24 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")"
 [[ $EUID -eq 0 ]] || { echo 'Run as root (sudo bash deploy-observe.sh)'; exit 1; }
 
+# cruza-stream (video + detections from one camera) supersedes this detector and
+# owns the IMX500; two processes cannot. Installing this one alongside it is the
+# boot race that cost video and detections on 28 Oct 2026.
+if systemctl is-enabled --quiet cruza-stream.service 2>/dev/null \
+   || systemctl is-active --quiet cruza-stream.service 2>/dev/null; then
+    echo 'cruza-stream is enabled or running: it already publishes detections from'
+    echo 'the same camera, with video. Only one process can own the IMX500.'
+    echo 'To go back to the separate detector, first:'
+    echo '    sudo systemctl disable --now cruza-stream.service'
+    exit 1
+fi
+
+# The unit file is the single source of truth for the account the detector runs
+# as: the reflashed image has no 'ebach'. Override with CRUZA_USER=... if needed.
+cruza_user=${CRUZA_USER:-$(sed -n 's/^User=//p' systemd/cruza-observe.service | head -1)}
+id -u "$cruza_user" >/dev/null 2>&1 || {
+    echo "No such user: ${cruza_user:-(none)}. Set CRUZA_USER=<account> and rerun."; exit 1; }
+
 # Fail early if the IMX500 stack is not ready, so we never install a detector
 # that cannot run. This checks only; it installs no packages and changes nothing.
 model=/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk
@@ -17,8 +35,8 @@ if [[ ! -e "$model" ]]; then
     echo "Install the firmware first:  sudo apt install imx500-all python3-picamera2"
     exit 1
 fi
-if ! sudo -u ebach python3 -c 'from picamera2 import Picamera2; from picamera2.devices import IMX500' 2>/dev/null; then
-    echo 'picamera2 / IMX500 Python support not available for user ebach.'
+if ! sudo -u "$cruza_user" python3 -c 'from picamera2 import Picamera2; from picamera2.devices import IMX500' 2>/dev/null; then
+    echo "picamera2 / IMX500 Python support not available for user $cruza_user."
     echo 'Install:  sudo apt install python3-picamera2'
     exit 1
 fi
@@ -61,7 +79,7 @@ else:
 PY
 
 # Validate the config loads (no camera opened, no records sent).
-sudo -u ebach python3 /opt/cruza/observe.py --synthetic 0
+sudo -u "$cruza_user" python3 /opt/cruza/observe.py --synthetic 0
 
 systemctl daemon-reload
 echo
@@ -69,8 +87,10 @@ echo "Installed. Backup: $backup"
 echo "The detector is NOT enabled. Review the camera field-of-view and mount"
 echo "angles, then enable it as a deliberate step:"
 echo "    sudo systemctl enable --now cruza-observe.service"
+echo "This unit conflicts with cruza-stream: enabling it stops that service and"
+echo "gives up the combined video + detection stream. Enable only one of them."
 echo "Watch it:        journalctl -fu cruza-observe"
-echo "Bench self-test: sudo -u ebach python3 /opt/cruza/observe.py --synthetic 8"
+echo "Bench self-test: sudo -u $cruza_user python3 /opt/cruza/observe.py --synthetic 8"
 echo
 echo "Rollback:"
 echo "    sudo systemctl disable --now cruza-observe.service"

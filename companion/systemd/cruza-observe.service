@@ -3,12 +3,15 @@ Description=Cruza IMX500 observation detector (advisory, camera-only)
 After=multi-user.target
 # No dependency on the router, video or flight services. Camera-only; this unit
 # never touches the FC, MAVLink, routes or the modem.
+# Superseded by cruza-stream (video + detections from one camera). Both cannot
+# own the IMX500, so starting this one stops that one, deliberately.
+Conflicts=cruza-stream.service
 StartLimitIntervalSec=300
 StartLimitBurst=3
 
 [Service]
 Type=simple
-User=ebach
+User=jbrascom
 SupplementaryGroups=video render
 ExecStart=/usr/bin/python3 /opt/cruza/observe.py
 Restart=on-failure

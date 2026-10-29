@@ -2,12 +2,15 @@
 Description=Cruza H264 RTP video
 After=network-online.target tailscaled.service
 Wants=network-online.target tailscaled.service
+# Superseded by cruza-stream (video + detections from one camera). Both cannot
+# own the IMX500, so starting this one stops that one, deliberately.
+Conflicts=cruza-stream.service
 StartLimitIntervalSec=300
 StartLimitBurst=3
 
 [Service]
 Type=simple
-User=ebach
+User=jbrascom
 SupplementaryGroups=video render
 ExecStart=/usr/bin/python3 /opt/cruza/cruza.py video
 Restart=on-failure

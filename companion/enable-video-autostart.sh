@@ -2,6 +2,16 @@
 # Opt-in deployment for continuous video; no flight-controller changes or reboot.
 set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo 'Run with sudo bash enable-video-autostart.sh'; exit 1; }
+# cruza-stream (video + detections from one camera) owns the IMX500. Enabling
+# rpicam video at boot as well would take the camera from it, which is exactly
+# the boot race that cost video and detections on 28 Oct 2026.
+if systemctl is-enabled --quiet cruza-stream.service 2>/dev/null \
+   || systemctl is-active --quiet cruza-stream.service 2>/dev/null; then
+    echo 'cruza-stream is enabled or running; it already provides continuous video.'
+    echo 'Only one process can own the IMX500. To go back to rpicam video, first:'
+    echo '    sudo systemctl disable --now cruza-stream.service'
+    exit 1
+fi
 cd -- "$(dirname -- "$0")"
 source_dir=$PWD
 backup=/var/backups/cruza/video-autostart-$(date -u +%Y%m%dT%H%M%SZ)
