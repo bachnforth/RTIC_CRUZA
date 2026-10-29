@@ -817,10 +817,12 @@ def main(argv=None):
     session_start = meta["w"]
     session_end = (sender["end"] or {}).get("w") or max(
         (tw for t in sender["tx"].values() for tw, _ in t.values()), default=session_start)
-    flights = [(max(a, session_start), min(b, session_end)) for a, b in flights if b > session_start and a < session_end]
+    overlapping = [(a, b) for a, b in flights if b > session_start and a < session_end]
+    flights = [(max(a, session_start), min(b, session_end)) for a, b in overlapping]
     home = None
     if cruza:
-        t_home = flights[0][0] if flights else track[0][0]
+        # Home is where the flight launched, even if the sender started after takeoff.
+        t_home = overlapping[0][0] if overlapping else track[0][0]
         home = cruza.at(t_home) or track[0][1:4]
 
     quad_positions, quad_tracks = {}, {}

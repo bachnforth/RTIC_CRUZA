@@ -1,0 +1,104 @@
+{
+  "run": "20261029T223616Z-pnmd",
+  "criteria": {
+    "uplink_delivery_pct": 98,
+    "window_s": 10,
+    "window_min_pct": 90,
+    "windows_pass_pct": 95,
+    "rtt_p95_ms": 1000,
+    "max_outage_s": 5,
+    "burst_complete_pct": 90,
+    "burst_min_kbps": 64,
+    "min_probes": 300,
+    "min_distance_m": 1000,
+    "distance_bin_m": 250
+  },
+  "flights": [
+    [
+      1793313376.6223,
+      1793313638.8000479
+    ]
+  ],
+  "targets": {
+    "quadpi/vpn": {
+      "verdict": "FAIL",
+      "reasons": [
+        "The Cruza only reached 672 m (need 1000 m) - range not demonstrated."
+      ],
+      "metrics": {
+        "probes": 1311,
+        "uplink_pct": 94.35545385202136,
+        "windows": 27,
+        "windows_pass_pct": 96.29629629629629,
+        "rtt_p50_ms": 155.0,
+        "rtt_p95_ms": 1608.394999999982,
+        "rtt_max_ms": 12147.7,
+        "reply_pct": 91.83829138062548,
+        "longest_outage_s": 6.400800180435181,
+        "outages_over_1s": 1,
+        "bursts": 9,
+        "burst_complete_pct": 44.44444444444444,
+        "burst_median_kbps": 518.0,
+        "distance_basis": "distance from the Cruza's launch point",
+        "max_distance_m": 671.7896155159086,
+        "max_distance_delivered_m": 671.7896155159086,
+        "contiguous_good_range_m": 500.0,
+        "max_alt_m": 63.62747999074938,
+        "clock_offset_s": -0.008000075817108154,
+        "send_errors": 0,
+        "time_on_wifi_pct": 0.0,
+        "paths": [
+          "derp:ord",
+          "direct"
+        ],
+        "routes": [
+          "tailscale0"
+        ]
+      },
+      "checks": [
+        {
+          "label": "Overall delivery to the quad",
+          "value": 94.35545385202136,
+          "limit": ">= 98",
+          "unit": "%",
+          "ok": false
+        },
+        {
+          "label": "10 s windows at or above 90% delivery",
+          "value": 96.29629629629629,
+          "limit": ">= 95",
+          "unit": "%",
+          "ok": true
+        },
+        {
+          "label": "Round-trip time, 95th percentile",
+          "value": 1608.394999999982,
+          "limit": "<= 1000",
+          "unit": " ms",
+          "ok": false
+        },
+        {
+          "label": "Longest continuous loss",
+          "value": 6.400800180435181,
+          "limit": "<= 5",
+          "unit": " s",
+          "ok": false
+        },
+        {
+          "label": "Data bursts fully delivered",
+          "value": 44.44444444444444,
+          "limit": ">= 90",
+          "unit": "%",
+          "ok": false
+        },
+        {
+          "label": "Median burst throughput",
+          "value": 518.0,
+          "limit": ">= 64",
+          "unit": " kbit/s",
+          "ok": true
+        }
+      ]
+    }
+  }
+}

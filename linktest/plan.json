@@ -3,8 +3,8 @@
   "port": 15700,
   "duration_s": 3600,
   "cruza": {
-    "ssh": "ebach@100.100.0.58",
-    "tailnet_ip": "100.100.0.58",
+    "ssh": "jbrascom@100.100.0.34",
+    "tailnet_ip": "100.100.0.34",
     "lte_interface": "wwan0",
     "extra_allow": []
   },
