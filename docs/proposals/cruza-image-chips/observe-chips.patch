@@ -1,0 +1,159 @@
+diff --git a/companion/observe.py b/companion/observe.py
+index 49a90f4..a5f350d 100644
+--- a/companion/observe.py
++++ b/companion/observe.py
+@@ -15,6 +15,14 @@ The loopback consumer is companion/observe-tap.py (deployed to
+ like the video and telemetry observers. Records are newline-free JSON, one per
+ UDP datagram, kept small (< 512 bytes).
+ 
++Optional image chips (observe.chips, off by default): for a published detection,
++a small JPEG of the box and its surroundings is sent as numbered parts, each its
++own datagram under the same 512-byte cap, so observe-tap.py needs no change:
++    {"t": ..., "chip": <seq of the detection>, "part": i, "parts": n, "jpg": "<base64>"}
++A chip is sent with the first record of a class and then at most every
++chip_seconds while it stays in view. It is a picture for the operator, not a
++measurement; the record's angles are unchanged.
++
+ Angles use the camera boresight as origin: az_rel_deg is positive to the right,
+ el_rel_deg is positive up. They are small-angle estimates from the detection box
+ centre and the configured camera field of view; they are cueing hints, not a
+@@ -22,7 +30,9 @@ calibrated sensor line. Validate the field-of-view values against the lens
+ before trusting the bearings.
+ """
+ import argparse
++import base64
+ import datetime as dt
++import io
+ import json
+ import math
+ import os
+@@ -65,9 +75,16 @@ def load_config(path):
+     if not isinstance(classes, list) or any(not isinstance(x, str) for x in classes):
+         raise ValueError("observe.classes must be a list of class names")
+     classes = {x.lower() for x in classes}
++    chips = o.get("chips", False)
++    if not isinstance(chips, bool):
++        raise ValueError("observe.chips must be true or false")
++    chip_seconds = o.get("chip_seconds", 20.0)
++    if not isinstance(chip_seconds, (int, float)) or not 5 <= chip_seconds <= 600:
++        raise ValueError("observe.chip_seconds must be 5..600")
+     return dict(model=model, port=port, min_score=float(min_score),
+                 max_rate=float(max_rate), repeat=float(repeat),
+-                hfov=float(hfov), vfov=float(vfov), classes=classes)
++                hfov=float(hfov), vfov=float(vfov), classes=classes,
++                chips=chips, chip_seconds=float(chip_seconds))
+ 
+ 
+ def emit_log(event, **fields):
+@@ -106,6 +123,57 @@ class Publisher:
+             self.sock.sendto(data, self.addr)
+         except OSError:
+             pass
++        return self.seq
++
++    def send_chip(self, seq, jpeg):
++        """Send one JPEG as numbered parts naming detection `seq`. Each part
++        stays under the 512-byte cap; a chip over CHIP_MAX_BYTES is not sent."""
++        if not jpeg or len(jpeg) > CHIP_MAX_BYTES:
++            return False
++        text = base64.b64encode(jpeg).decode()
++        chunks = [text[i:i + CHIP_PART_CHARS] for i in range(0, len(text), CHIP_PART_CHARS)]
++        if len(chunks) > CHIP_MAX_PARTS:
++            return False
++        t = round(time.time(), 2)
++        for i, chunk in enumerate(chunks):
++            data = json.dumps({"t": t, "chip": seq, "part": i, "parts": len(chunks),
++                               "jpg": chunk}).encode()
++            try:
++                self.sock.sendto(data, self.addr)
++            except OSError:
++                return False
++            time.sleep(0.003)  # stay well inside the tap's 32 KB receive buffer
++        return True
++
++
++# Image chip limits; the laptop discards anything outside them.
++CHIP_PART_CHARS = 400      # base64 characters per part (multiple of 4)
++CHIP_MAX_PARTS = 64
++CHIP_MAX_BYTES = 24576
++CHIP_SIZE = (160, 120)     # pixels
++CHIP_QUALITY = 70
++
++
++def chip_jpeg(frame, bbox, margin=0.5):
++    """Crop the box (normalised x, y, w, h) plus a margin from an RGB/RGBA
++    frame and return a small JPEG, or None. Box coordinates are in the
++    network's input space; the generous margin covers the small offset from
++    the full frame's scaling."""
++    from PIL import Image  # pillow is a picamera2 dependency
++    h, w = frame.shape[:2]
++    x, y, bw, bh = bbox
++    cx, cy = x + bw / 2, y + bh / 2
++    half_w = max(bw * (1 + margin), 0.08) / 2
++    half_h = max(bh * (1 + margin), 0.08) / 2
++    box = (int(clamp01(cx - half_w) * w), int(clamp01(cy - half_h) * h),
++           int(clamp01(cx + half_w) * w), int(clamp01(cy + half_h) * h))
++    if box[2] - box[0] < 4 or box[3] - box[1] < 4:
++        return None
++    image = Image.fromarray(frame[..., :3]).crop(box)
++    image.thumbnail(CHIP_SIZE)
++    out = io.BytesIO()
++    image.save(out, "JPEG", quality=CHIP_QUALITY)
++    return out.getvalue()
+ 
+ 
+ def clamp01(v):
+@@ -174,6 +242,7 @@ def run(cfg):
+     min_interval = 1.0 / cfg["max_rate"]
+     last_emit = 0.0
+     last_seen = {}  # class name -> monotonic time last published (debounce)
++    last_chip = {}  # class name -> monotonic time of its last image chip
+     try:
+         while running["on"]:
+             metadata = picam2.capture_metadata()
+@@ -205,7 +274,17 @@ def run(cfg):
+             last_seen[name] = now
+             last_emit = now
+             cx, cy = bbox[0] + bbox[2] / 2, bbox[1] + bbox[3] / 2
+-            pub.send(name, score, cx, cy, bbox, cfg["hfov"], cfg["vfov"])
++            seq = pub.send(name, score, cx, cy, bbox, cfg["hfov"], cfg["vfov"])
++            if cfg["chips"] and now - last_chip.get(name, -1e9) >= cfg["chip_seconds"]:
++                # The next frame, not the one inference ran on (~1 frame later);
++                # fine for a picture for the operator.
++                try:
++                    jpeg = chip_jpeg(picam2.capture_array("main"), bbox)
++                except Exception as error:  # noqa: BLE001 - a picture must never stop detection
++                    emit_log("observe_chip_error", detail=str(error)[:200])
++                    jpeg = None
++                if jpeg and pub.send_chip(seq, jpeg):
++                    last_chip[name] = now
+     finally:
+         try:
+             picam2.stop()
+@@ -224,11 +303,25 @@ def synthetic(cfg, count):
+     for i in range(count):
+         name, score, cx, cy = samples[i % len(samples)]
+         bbox = [clamp01(cx - 0.06), clamp01(cy - 0.08), 0.12, 0.16]
+-        pub.send(name, score, cx, cy, bbox, cfg["hfov"], cfg["vfov"])
++        seq = pub.send(name, score, cx, cy, bbox, cfg["hfov"], cfg["vfov"])
++        if cfg["chips"]:
++            pub.send_chip(seq, synthetic_chip(name, seq))
+         time.sleep(max(0.1, 1.0 / cfg["max_rate"]))
+     emit_log("observe_synthetic_done")
+ 
+ 
++def synthetic_chip(name, seq):
++    """A plainly labelled test picture for --synthetic, never a camera frame."""
++    from PIL import Image, ImageDraw
++    image = Image.new("RGB", CHIP_SIZE, (70, 90, 60))
++    draw = ImageDraw.Draw(image)
++    draw.rectangle([1, 1, CHIP_SIZE[0] - 2, CHIP_SIZE[1] - 2], outline=(255, 210, 120), width=2)
++    draw.text((6, 6), f"SYNTHETIC {name} #{seq}", fill=(255, 255, 255))
++    out = io.BytesIO()
++    image.save(out, "JPEG", quality=CHIP_QUALITY)
++    return out.getvalue()
++
++
+ def main():
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument("--config", default="/etc/cruza/config.json")
