@@ -1,84 +1,301 @@
-:root{color-scheme:dark;font-family:Segoe UI,system-ui,sans-serif;background:#0a1017;color:#e5edf4}*{box-sizing:border-box}body{margin:0}main{max-width:1760px;margin:auto;padding:30px}header,.head,.videofoot{display:flex;align-items:center;justify-content:space-between;gap:16px}header{margin-bottom:22px}small{color:#87b6b0;font-size:11px;letter-spacing:1px}h1{font-size:30px;font-weight:550;margin:8px 0}h2{font-size:17px;margin:0 0 5px}p{font-size:12px;color:#94aaba;line-height:1.7;margin:0}button{background:#1a2b38;border:1px solid #385466;color:#e5edf4;border-radius:6px;padding:9px 13px;font:inherit;font-size:12px;cursor:pointer}button:hover{background:#294453}button:focus-visible{outline:2px solid #8ce7c9}.notice{color:#97d8bc;margin-bottom:22px}.mapbox{background:#101b25;border:1px solid #293e4e;border-radius:10px;padding:18px;margin-bottom:22px}#map{width:100%;height:230px;background:#0b151f;margin:12px 0;border-radius:6px}#map text{fill:#a5bbca;font:12px Segoe UI,sans-serif}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.card{background:#111d27;border:1px solid #293e4e;border-radius:10px;overflow:hidden;min-width:0}.head{padding:18px}.head small{letter-spacing:0;color:#93a9ba;display:block}.badge{color:#d2b287;font-size:10px;text-align:right}.live{color:#83dfbc}.video{aspect-ratio:16/9;position:relative;background:#030609;border-block:1px solid #293e4e}iframe{width:100%;height:100%;border:0;display:block}.overlay{position:absolute;inset:0;display:grid;place-items:center;background:#030609;color:#93a9ba}.overlay[hidden]{display:none}.videofoot{padding:10px 16px;color:#94aaba;font-size:11px}.videofoot button{padding:4px 8px}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:15px;padding:18px;border-top:1px solid #293e4e}.metric small{display:block;font-size:10px;color:#8da6b8;letter-spacing:.6px;text-transform:uppercase;margin-bottom:5px}.metric span{font-size:14px;font-variant-numeric:tabular-nums}.mission{padding:14px 18px;border-top:1px solid #293e4e;font-size:12px;line-height:1.8;color:#b1c3d0;white-space:pre-line}.details{padding:0 18px 16px;font-size:11px;color:#91a7b9;line-height:1.6;overflow-wrap:anywhere}.placeholder{padding:22px 18px;min-height:180px;color:#92a9bb;font-size:13px;line-height:1.8}footer{border-top:1px solid #293e4e;margin-top:24px;padding-top:18px;display:grid;gap:9px}#connection{color:#9bcdbb}.card:fullscreen{display:flex;flex-direction:column;border:0;border-radius:0}.card:fullscreen .video{flex:1;aspect-ratio:auto}.card:fullscreen .metrics,.card:fullscreen .mission,.card:fullscreen .details{display:none}@media(max-width:1150px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:720px){main{padding:18px}.grid{grid-template-columns:1fr}header{flex-wrap:wrap;align-items:flex-start}h1{font-size:26px}#map{height:180px}.mapbox{padding:12px}}
-/* Geographic map */
-.map-heading{display:flex;justify-content:space-between;gap:18px;align-items:center}.map-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.map-actions label{font-size:12px;color:#aec0cd;white-space:nowrap}.map-actions input{accent-color:#79d7b9;vertical-align:middle}#map{height:420px;isolation:isolate;background:#122333;margin:16px 0 0}#map svg text{font:inherit}#map-empty{font-size:13px;color:#c1d1dd;padding:12px 14px;background:#182b3b;border:1px solid #324b5d;border-radius:0 0 6px 6px}#map-empty[hidden]{display:none}#map-legend{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}.map-aircraft{text-align:left;padding:12px;min-width:0;background:#142531;border-color:#2c4556}.map-aircraft strong{display:block;font-size:12px;margin-bottom:5px}.map-aircraft span{display:block;color:#9bb1c1;font-size:11px;line-height:1.6;overflow-wrap:anywhere}.map-aircraft .swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}.map-aircraft:disabled{cursor:default;opacity:1}.map-options{display:flex;gap:14px;align-items:center;border-top:1px solid #2a4050;padding-top:14px}.map-options p{font-size:11px;flex:1}.map-help{margin-top:12px;font-size:11px}.leaflet-tooltip.aircraft-label{background:#102330;color:#eff6fa;border:1px solid #647f90;box-shadow:0 2px 10px #0005;padding:5px 8px;font:12px Segoe UI,sans-serif}.leaflet-tooltip.aircraft-label:before{display:none}.leaflet-container{font:12px Segoe UI,sans-serif}.leaflet-container a{color:#18547c}.leaflet-control-scale-line{background:#eff5f5d9;color:#183142;border-color:#365565}.leaflet-container .leaflet-control-attribution{background:#f3f6f5e8;color:#233743}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#152938;color:#e8f2f7}.leaflet-popup-content{line-height:1.8;font-size:12px}.mapbox:fullscreen{padding:22px;overflow:auto;background:#101b25}.mapbox:fullscreen #map{height:calc(100vh - 270px);min-height:300px}@media(max-width:720px){.map-heading{display:block}.map-actions{margin-top:12px;gap:8px}#map{height:320px}.map-options{align-items:flex-start;flex-direction:column;gap:8px}#map-legend{grid-template-columns:1fr}.map-aircraft{padding:10px}.mapbox:fullscreen #map{height:50vh}}
-/* Full-width map above three equal aircraft cards. */
-.workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}.workspace .mapbox{margin:0;position:static;min-width:0}.workspace #fleet{grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}.workspace .map-heading{align-items:center;flex-direction:row;flex-wrap:wrap;gap:10px}.workspace #map{height:clamp(380px,48vh,680px)}.workspace #map-legend{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.workspace .map-aircraft{padding:9px 8px}.workspace .head{min-height:82px}.video-empty{position:absolute;inset:0;display:grid;place-items:center;padding:18px;text-align:center;color:#93a9ba;font-size:13px}.telemetry{border-top:1px solid #293e4e}.telemetry summary{padding:11px 16px;font-size:12px;color:#b4c9d7;cursor:pointer}.telemetry .metrics{border-top:0;padding-top:6px}.card:fullscreen .telemetry{display:none}main:fullscreen{width:100%;max-width:none;overflow:auto;background:#0a1017;padding:22px}main:fullscreen .workspace #map{height:clamp(380px,48vh,680px)}@media(max-width:1049px){.workspace{grid-template-columns:1fr}.workspace .mapbox{position:static;padding:12px}.workspace #map{height:clamp(340px,48vh,560px)}.workspace .map-heading{flex-direction:row;align-items:center;flex-wrap:wrap;gap:6px}.workspace .map-actions{margin:0;gap:6px}.workspace .map-actions button{padding:6px 8px}.workspace #map-legend{margin:9px 0}.workspace .map-options{padding-top:9px;flex-direction:row;gap:9px}.workspace .map-options p{font-size:10px;line-height:1.4}.workspace .map-help{display:none}.workspace #map-empty{font-size:11px;padding:7px 10px}.workspace .map-aircraft strong{font-size:11px}.workspace .map-aircraft span{font-size:10px}.workspace .head{padding:10px;gap:6px;flex-wrap:wrap}.workspace .head h2{font-size:14px}.workspace .head small{font-size:10px}.workspace .badge{font-size:9px}.workspace .videofoot{padding:7px 9px;gap:6px;flex-wrap:wrap;font-size:10px}.workspace .telemetry summary{font-size:11px;padding:9px}.workspace .metrics{padding:10px;gap:10px;grid-template-columns:1fr}.workspace .mission,.workspace .details{padding:10px}.workspace #fleet{gap:10px}header{margin-bottom:12px}.notice{margin-bottom:12px}main:fullscreen .workspace #map{height:clamp(340px,48vh,560px)}}
-@media(max-width:720px){main{padding:12px}h1{font-size:23px;margin:5px 0}header{margin-bottom:8px;gap:8px}header p{font-size:11px}.notice{font-size:10px;margin-bottom:8px}.workspace{gap:10px}.workspace #map,main:fullscreen .workspace #map{height:clamp(280px,45svh,440px);margin-top:9px}.workspace .mapbox{padding:10px}.workspace .map-heading h2{font-size:14px}.workspace #map-status{font-size:10px}.workspace .map-actions label{font-size:10px}.workspace .map-actions button{font-size:10px;padding:5px 7px}.workspace .map-aircraft{padding:6px}.workspace #map-legend{margin:7px 0}.workspace .map-options button{padding:7px;font-size:10px}.workspace .map-options p{font-size:10px}.workspace .head small{line-height:1.3}.workspace .head{min-height:75px}.workspace .videofoot button{font-size:10px}.workspace .videofoot{gap:3px}.workspace .telemetry summary{padding:7px;font-size:10px}}
-.state-label{background:none;border:0;box-shadow:none;color:#d0e0e9;font:600 11px Segoe UI,sans-serif;text-align:center;line-height:16px;text-shadow:0 1px 3px #07131b,1px 0 3px #07131b,-1px 0 3px #07131b;pointer-events:none}
-.al-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:11px;color:#a9c0d0;padding:9px 0 4px}.al-controls strong{font-size:10px;letter-spacing:.4px;text-transform:uppercase;color:#88a9bc}.al-controls input{accent-color:#7cd2b5;vertical-align:middle}#al-detail-status{font-size:10px;line-height:1.5;padding-bottom:7px;color:#88a5b8}.al-label{border:0;background:transparent;box-shadow:none;white-space:nowrap;line-height:18px;text-align:center;pointer-events:none;font:600 11px/18px Segoe UI,sans-serif;color:#eef6fb;text-shadow:0 1px 3px #07131b,1px 0 3px #07131b,-1px 0 3px #07131b}.al-label.city{text-align:left}.al-label.county{color:#a8bcc9;font-size:10px;font-weight:400;font-style:italic}.al-label.road span{background:#28333c;color:#f7ce91;border:1px solid #af9367;border-radius:4px;padding:1px 4px;text-shadow:none;font-size:10px}@media(max-width:720px){.al-controls{gap:6px;font-size:10px;padding:5px 0 2px}#al-detail-status{font-size:9px;padding-bottom:4px}.workspace #map,main:fullscreen .workspace #map{height:clamp(280px,45svh,440px)}}
+/* Cruza / RTIC fleet dashboard — map-first tactical layout (2026-10-29).
+   The page never scrolls: the map fills the screen, aircraft tiles sit across
+   the top, tools live on a left rail, and video floats over the map. */
 
-/* Alerts, readings and graphs (2026-10-18) */
-.header-actions{display:flex;gap:10px;flex-wrap:wrap}
+:root{
+  color-scheme:dark;
+  --bg:#0a1017; --panel:#101b25; --glass:rgba(11,19,27,.9); --line:#293e4e; --line2:#385466;
+  --text:#e5edf4; --muted:#94aaba; --dim:#7f97a9; --accent:#8ce7c9;
+  --warn:#f2b84b; --warn-bg:#33270f; --crit:#ff5c66; --crit-bg:#3a1216; --armed:#ffb38a;
+  --top:80px; --status:30px; --rail:62px;
+  --pip-w:340px;
+  font-family:"Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--text);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg)}
+p{font-size:12px;color:var(--muted);line-height:1.6;margin:0}
+h3{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#88a9bc;margin:18px 0 8px;font-weight:600}
+h3:first-child{margin-top:4px}
+button{background:#1a2b38;border:1px solid var(--line2);color:var(--text);border-radius:6px;padding:8px 12px;font:inherit;font-size:12px;cursor:pointer}
+button:hover{background:#294453}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,label:focus-within,.tile:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.i{width:18px;height:18px;flex:none;display:inline-block;vertical-align:middle}
+kbd{font:600 11px/1 "Cascadia Mono",Consolas,monospace;background:#1d2f3c;border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:3px 6px;color:#d6e6f0}
+
+/* ---------- Overall frame ---------- */
+#app{height:100dvh;display:grid;grid-template-rows:var(--top) auto minmax(0,1fr) var(--status);background:var(--bg)}
+#app:fullscreen{width:100%;height:100%}
+
+/* ---------- Top bar & aircraft tiles ---------- */
+.topbar{display:flex;align-items:stretch;gap:10px;padding:6px 10px;background:linear-gradient(#0f1a24,#0b141c);border-bottom:1px solid var(--line);min-width:0}
+.brand{display:flex;flex-direction:column;justify-content:center;padding:0 6px 0 2px;border-right:1px solid var(--line);padding-right:12px}
+.brand b{font-size:15px;letter-spacing:3px;color:#e9f4f1}
+.brand span{font-size:9px;letter-spacing:1.4px;color:#87b6b0}
+.tiles{display:flex;gap:8px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:thin}
+.tile{--c:#7ce1ba;position:relative;flex:1 1 0;min-width:230px;max-width:360px;display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-content:center;
+  background:#132330;border:1px solid var(--line);border-left:4px solid var(--c);border-radius:7px;padding:5px 8px 5px 10px;cursor:pointer;text-align:left;user-select:none}
+.tile:hover{background:#18303f}
+.tile.selected{background:#1b3446;border-color:#5f8aa3;border-left-color:var(--c);box-shadow:inset 0 0 0 1px #5f8aa355}
+.tile.has-warning{border-color:var(--warn);border-left-color:var(--c)}
+.tile.has-critical{border-color:var(--crit);border-left-color:var(--c);background:#2a171c;animation:tile-pulse 1.6s ease-in-out infinite}
+@keyframes tile-pulse{50%{box-shadow:0 0 0 3px #ff5c6640}}
+.tile.unconfigured{opacity:.6}
+.tile.preview-selected{outline:2px dashed #ffd68a;outline-offset:1px}
+.tile-name{grid-column:1;grid-row:1;display:flex;align-items:center;gap:7px;min-width:0;line-height:20px}
+.tile-name b{font-size:14px;white-space:nowrap}
+.tile-name kbd{font-size:9px;padding:1px 4px;opacity:.7}
+.tile-state{font-size:9px;font-weight:700;letter-spacing:.8px;padding:2px 6px;border-radius:3px;background:#24343f;color:#a9bccb;white-space:nowrap}
+.tile-state.live{background:#173d31;color:#8ff0c8}
+.tile-state.stale{background:var(--crit-bg);color:#ffb0b6}
+.tile-state.armed{background:#4a2a14;color:var(--armed)}
+.tile-acts{grid-column:2;grid-row:1;display:flex;gap:2px;align-items:center}
+.tile-acts button{padding:3px;border:0;background:transparent;color:#9fb6c6;border-radius:4px;line-height:0}
+.tile-acts button:hover{background:#2a4557;color:#fff}
+.tile-mode{grid-column:1/-1;font-size:11px;line-height:16px;color:#c4d4df;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px;align-items:center}
+.tile-mode .alert-txt{color:#ffb0b6;font-weight:600}
+.tile-mode .alert-txt.warning{color:#ffd68a}
+.tile-vals{grid-column:1/-1;display:flex;gap:10px;font-size:11px;line-height:16px;font-variant-numeric:tabular-nums;color:#e2ecf3;white-space:nowrap}
+.tile-vals span{display:flex;gap:3px;align-items:baseline}
+.tile-vals small{font-size:9px;color:var(--dim);letter-spacing:.5px}
+.tile-vals .warning{color:#ffd68a}.tile-vals .critical{color:#ff9aa1;font-weight:700}
+.tile-vals .stale{color:var(--dim);font-style:italic}
+.batt{display:inline-block;width:22px;height:9px;border:1px solid #8aa2b2;border-radius:2px;position:relative;align-self:center;margin-right:2px}
+.batt::after{content:"";position:absolute;right:-3px;top:2px;width:2px;height:3px;background:#8aa2b2}
+.batt i{position:absolute;inset:1px auto 1px 1px;background:#7ce1ba;border-radius:1px}
+.batt.warning i{background:var(--warn)}.batt.critical i{background:var(--crit)}
+.top-actions{display:flex;gap:6px;align-items:center}
+.tbtn{display:flex;gap:6px;align-items:center;height:100%;max-height:44px;padding:6px 10px}
 #sound[aria-pressed="true"]{border-color:#7ce1ba;color:#bff3df}
-#alerts{border-radius:10px;padding:14px 18px;margin-bottom:22px;display:flex;gap:16px;align-items:flex-start;justify-content:space-between;border:2px solid}
+#toggle.paused{border-color:var(--warn);color:#ffe3aa}
+.clock{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;padding-left:8px;border-left:1px solid var(--line);font-variant-numeric:tabular-nums;min-width:74px}
+.clock b{font-size:15px;font-weight:600}
+.clock span{font-size:10px;color:var(--muted)}
+
+/* ---------- Alert strip ---------- */
+#alerts{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:5px 12px;border-bottom:2px solid;max-height:96px;overflow:auto}
 #alerts[hidden]{display:none}
-#alerts.critical{background:#3a1216;border-color:#ff5c66;animation:pulse 1.6s ease-in-out infinite}
-#alerts.warning{background:#33270f;border-color:#f2b84b}
-#alerts ul{list-style:none;margin:0;padding:0;display:grid;gap:8px;flex:1}
-#alerts li{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:14px}
-#alerts li b{font-size:11px;letter-spacing:.8px;min-width:96px}
-#alerts li.critical b{color:#ff9aa1}
-#alerts li.warning b{color:#ffd68a}
+#alerts.critical{background:var(--crit-bg);border-color:var(--crit);animation:pulse 1.6s ease-in-out infinite}
+#alerts.warning{background:var(--warn-bg);border-color:var(--warn)}
+#alerts ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 22px;flex:1}
+#alerts li{display:flex;gap:8px;align-items:baseline;font-size:13px}
+#alerts li b{font-size:10px;letter-spacing:.8px}
+#alerts li.critical b{color:#ff9aa1}#alerts li.warning b{color:#ffd68a}
 #alerts li strong{font-weight:600}
 #alerts li span{color:#f1e7e7}
-@keyframes pulse{50%{box-shadow:0 0 0 4px #ff5c6633}}
-@media(prefers-reduced-motion:reduce){#alerts.critical{animation:none}}
-.card.has-critical{border-color:#ff5c66;box-shadow:0 0 0 1px #ff5c66}
-.card.has-warning{border-color:#f2b84b}
+#alerts button{padding:5px 10px;white-space:nowrap}
+@keyframes pulse{50%{box-shadow:inset 0 0 0 999px #ff5c6614}}
+@media(prefers-reduced-motion:reduce){#alerts.critical,.tile.has-critical{animation:none}}
+
+/* ---------- Stage: map + floating layers ---------- */
+.stage{position:relative;min-height:0;overflow:hidden;isolation:isolate}
+#map{position:absolute;inset:0;z-index:1;background:#122333;transition:none}
+.map-chip{position:absolute;left:50%;transform:translateX(-50%);top:10px;z-index:20;background:var(--glass);border:1px solid var(--line2);border-radius:999px;padding:6px 14px;font-size:12px;color:#c1d1dd;pointer-events:none;white-space:nowrap;max-width:calc(100% - 180px);overflow:hidden;text-overflow:ellipsis}
+#map-empty[hidden],.map-chip[hidden]{display:none}
+.measure-chip{top:auto;bottom:12px;pointer-events:auto;border-color:#ffd68a;color:#ffe9bd;font-variant-numeric:tabular-nums}
+.measure-chip b{color:#fff}
+
+/* Left tool rail */
+.rail{position:absolute;left:8px;top:8px;z-index:40;display:flex;flex-direction:column;gap:4px;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:4px;backdrop-filter:blur(6px)}
+.rail button{position:relative;width:54px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px 5px;background:transparent;border:1px solid transparent;color:#b9cdda;border-radius:7px}
+.rail button span{font-size:9px;letter-spacing:.3px}
+.rail button:hover{background:#1d3342;color:#fff}
+.rail button.active{background:#21445a;border-color:#4f86a6;color:#fff}
+.rail button[data-tool].active{background:#3d3214;border-color:#ffd68a;color:#ffe3aa}
+.rail em{position:absolute;top:2px;right:4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--crit);color:#fff;font:700 10px/16px "Segoe UI",sans-serif;font-style:normal;text-align:center}
+.rail em.notice{background:#3b7f6a}
+.rail em[hidden]{display:none}
+
+/* Drawer next to the rail */
+.drawer{position:absolute;z-index:45;left:calc(var(--rail) + 14px);top:8px;bottom:8px;width:392px;max-width:calc(100% - var(--rail) - 28px);display:flex;flex-direction:column;
+  background:rgba(13,22,31,.95);border:1px solid var(--line2);border-radius:10px;box-shadow:0 10px 40px #0008;backdrop-filter:blur(8px)}
+.drawer[hidden]{display:none}
+.drawer-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px 8px 14px;border-bottom:1px solid var(--line)}
+.drawer-head h2{font-size:14px;margin:0;letter-spacing:.3px}
+.icon-btn{padding:5px;line-height:0;background:transparent;border-color:transparent}
+.panel{overflow:auto;padding:12px 14px 16px;flex:1;min-height:0}
+.panel[hidden]{display:none}
+
+/* Segmented buttons */
+.seg{display:flex;gap:0;border:1px solid var(--line2);border-radius:7px;overflow:hidden;margin-bottom:10px}
+.seg button{flex:1;border:0;border-radius:0;background:#14232e;padding:7px 6px;display:flex;gap:6px;justify-content:center;align-items:center;font-size:12px;color:#b9cdda}
+.seg button+button{border-left:1px solid var(--line2)}
+.seg button.on,.seg button[aria-selected="true"]{background:#24465c;color:#fff}
+.seg .sw{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+/* Map view buttons (right) */
+.map-tools{position:absolute;right:10px;top:84px;z-index:35;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+.map-tools button,.map-tools label{display:flex;gap:7px;align-items:center;background:var(--glass);border:1px solid var(--line2);border-radius:7px;padding:6px 9px;font-size:11px;color:#cbdbe5;cursor:pointer;backdrop-filter:blur(6px)}
+.map-tools button[hidden]{display:none}
+.map-tools label input{position:absolute;opacity:0;pointer-events:none}
+.map-tools label:has(input:checked){border-color:#7ce1ba;color:#bff3df;background:#123329}
+.map-tools span{white-space:nowrap}
+.map-tools .i{width:15px;height:15px}
+
+/* Leaflet controls */
+.leaflet-top.leaflet-right{top:6px;right:4px}
+.leaflet-bar a{background:var(--glass);color:#dce8f0;border-color:var(--line2)}
+.leaflet-bar a:hover{background:#294453;color:#fff}
+.leaflet-container{font:12px "Segoe UI",sans-serif;background:#122333}
+.leaflet-container a{color:#18547c}
+.leaflet-bottom.leaflet-left{left:calc(var(--rail) + 16px)}
+.leaflet-control-scale-line{background:#eff5f5d9;color:#183142;border-color:#365565}
+.leaflet-container .leaflet-control-attribution{background:#f3f6f5e0;color:#233743;font-size:10px}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#152938;color:#e8f2f7}
+.leaflet-popup-content{line-height:1.8;font-size:12px}
+.leaflet-tooltip.aircraft-label{background:#102330;color:#eff6fa;border:1px solid #647f90;box-shadow:0 2px 10px #0005;padding:3px 7px;font:600 12px "Segoe UI",sans-serif}
+.leaflet-tooltip.aircraft-label:before{display:none}
+.leaflet-tooltip.measure-label{background:#302713;color:#ffe9bd;border:1px solid #ffd68a;font:600 12px "Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+.heading-arrow{pointer-events:none}
+.state-label{background:none;border:0;box-shadow:none;color:#d0e0e9;font:600 11px "Segoe UI",sans-serif;text-align:center;line-height:16px;text-shadow:0 1px 3px #07131b,1px 0 3px #07131b,-1px 0 3px #07131b;pointer-events:none}
+.al-label{border:0;background:transparent;box-shadow:none;white-space:nowrap;line-height:18px;text-align:center;pointer-events:none;font:600 11px/18px "Segoe UI",sans-serif;color:#eef6fb;text-shadow:0 1px 3px #07131b,1px 0 3px #07131b,-1px 0 3px #07131b}
+.al-label.city{text-align:left}
+.al-label.county{color:#a8bcc9;font-size:10px;font-weight:400;font-style:italic}
+.al-label.road span{background:#28333c;color:#f7ce91;border:1px solid #af9367;border-radius:4px;padding:1px 4px;text-shadow:none;font-size:10px}
+.candidate-pin{display:grid;place-items:center;border:2px solid #ffd68a;border-radius:50%;background:#302713;color:#ffe3aa;font-size:24px;box-shadow:0 0 0 3px #0a101799}
+#map.pick-point,.pick-point .leaflet-interactive,#map.measuring,.measuring .leaflet-interactive{cursor:crosshair}
+
+/* ---------- Picture-in-picture video ---------- */
+.videos{display:contents}
+.videos[data-size="s"]{--pip-w:250px}.videos[data-size="m"]{--pip-w:340px}.videos[data-size="l"]{--pip-w:480px}
+/* Windows are positioned against the stage; fleet.js stacks them bottom-up. */
+.vwin{--c:#7ce1ba;position:absolute;right:10px;bottom:10px;z-index:30;width:var(--pip-w);background:#05090d;border:1px solid var(--line2);border-top:3px solid var(--c);border-radius:8px;overflow:hidden;box-shadow:0 8px 28px #000a;display:flex;flex-direction:column}
+.vwin.selected{border-color:#6f9bb5;border-top-color:var(--c)}
+.vbar{display:flex;align-items:center;gap:6px;padding:4px 4px 4px 9px;background:#0f1b25;font-size:11px;min-width:0}
+.vbar b{font-size:12px}
+.vbar .vrate{color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.vbar .vrate.live{color:#9fe7c9}
+.vbar button{padding:3px;line-height:0;background:transparent;border:0;color:#a9c0cf}
+.vbar button:hover{background:#294453;color:#fff}
+.vbar .i{width:16px;height:16px}
+.vbody{position:relative;aspect-ratio:16/9;background:#030609}
+.vbody iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+.overlay,.video-empty{position:absolute;inset:0;display:grid;place-items:center;background:#030609;color:#93a9ba;font-size:12px;text-align:center;padding:10px}
+.overlay[hidden]{display:none}
+.vhud{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;flex-wrap:wrap;padding:14px 8px 5px;font:600 11px "Segoe UI",sans-serif;font-variant-numeric:tabular-nums;color:#f1f7fb;
+  background:linear-gradient(transparent,#000c);text-shadow:0 1px 2px #000;pointer-events:none}
+.vhud .armed{color:var(--armed)}.vhud .critical{color:#ff9aa1}.vhud .warning{color:#ffd68a}
+.vhud small{font-weight:400;color:#b6c8d4;margin-right:2px;font-size:9px;letter-spacing:.5px}
+.videos[data-size="s"] .vwin:not(.main) .vhud>:nth-child(n+4){display:none}
+.vwin.min .vbody{display:none}
+.vwin.min{width:auto;min-width:200px}
+/* QGC-style swap: one video takes the whole stage and the map becomes the PiP. */
+.vwin.main{inset:0;width:auto;height:auto;z-index:2;border:0;border-radius:0;box-shadow:none}
+.vwin.main .vbody{flex:1;aspect-ratio:auto}
+.vwin.main .vbar{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:3;border:1px solid var(--line2);border-radius:7px;background:var(--glass);padding-left:12px}
+.vwin.main .vhud{font-size:16px;gap:20px;padding:30px 20px 14px;justify-content:center}
+.vwin.main .vhud small{font-size:11px}
+.stage:not([data-main="map"]) #map{inset:auto 10px 10px auto;width:var(--map-pip-w,380px);height:calc(var(--map-pip-w,380px) * .62);z-index:31;border:2px solid #4f86a6;border-radius:8px;box-shadow:0 8px 28px #000a}
+.stage:not([data-main="map"]) .leaflet-control-zoom,.stage:not([data-main="map"]) .map-tools,.stage:not([data-main="map"]) #map-empty,.stage:not([data-main="map"]) .leaflet-control-attribution,.stage:not([data-main="map"]) .leaflet-control-scale{display:none}
+.map-swap{display:none}
+.stage:not([data-main="map"]) .map-swap{display:flex;gap:6px;align-items:center;position:absolute;z-index:32;right:16px;bottom:calc(var(--map-pip-w,380px) * .62 - 24px);padding:4px 9px;font-size:11px;background:var(--glass)}
+
+/* ---------- Status bar ---------- */
+.statusbar{display:flex;align-items:center;gap:16px;padding:0 12px;border-top:1px solid var(--line);background:#0b141c;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden}
+.statusbar .ro{color:#97d8bc;font-weight:600;letter-spacing:.6px;font-size:10px}
+.statusbar #map-status{flex:1;overflow:hidden;text-overflow:ellipsis}
+.statusbar .dim{color:#ffd68a}
+#cursor-coords{background:transparent;border:0;padding:2px 6px;font:12px "Cascadia Mono",Consolas,monospace;color:#d8e6ef}
+#cursor-coords:hover{background:#1d3342}
+#connection{color:#9bcdbb}
+
+/* ---------- Aircraft detail panel ---------- */
+.acp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+.acp-head small{display:block;color:#93a9ba;font-size:11px}
+.acp-head .badge{font-size:10px;font-weight:700;letter-spacing:.8px;color:#d2b287}
+.acp-head .badge.live{color:#83dfbc}
+.acp-actions{display:flex;gap:6px;margin:8px 0 10px;flex-wrap:wrap}
+.acp-actions button{display:flex;gap:6px;align-items:center;padding:6px 9px}
+.acp-actions .i{width:15px;height:15px}
+.card-alerts{display:grid;gap:4px;margin-bottom:8px}
 .card-alerts:empty{display:none}
-.card-alerts{display:grid;gap:1px;background:#293e4e}
-.card-alerts .alert{display:flex;gap:10px;padding:8px 16px;font-size:12px;align-items:baseline}
-.card-alerts .alert.critical{background:#3a1216;color:#ffd9dc}
-.card-alerts .alert.warning{background:#33270f;color:#ffeccb}
+.card-alerts .alert{display:flex;gap:10px;padding:7px 10px;font-size:12px;align-items:baseline;border-radius:5px}
+.card-alerts .alert.critical{background:var(--crit-bg);color:#ffd9dc;border-left:3px solid var(--crit)}
+.card-alerts .alert.warning{background:var(--warn-bg);color:#ffeccb;border-left:3px solid var(--warn)}
 .card-alerts b{font-size:10px;letter-spacing:.6px;white-space:nowrap}
-.metric.warning span{color:#ffd68a}
-.metric.critical span{color:#ff9aa1;font-weight:600}
-.metric.armed span{color:#ffb38a;font-weight:600}
-.metric.stale span{color:#7f97a9;font-style:italic}
-.stale-note{grid-column:1/-1;margin:0;padding:8px 10px;background:#1b2a36;border-left:3px solid #ff5c66;border-radius:4px;color:#d6e1e9}
-.charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 18px 16px}
+.pfd{display:block;width:100%;height:auto;margin:4px 0 10px;border-radius:8px;background:#0b141c;border:1px solid var(--line)}
+.pfd text{font-family:"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;padding:10px 0;border-top:1px solid var(--line)}
+.metric small{display:block;font-size:9.5px;color:#8da6b8;letter-spacing:.6px;text-transform:uppercase;margin-bottom:2px}
+.metric span{font-size:13px;font-variant-numeric:tabular-nums}
+.metric.warning span{color:#ffd68a}.metric.critical span{color:#ff9aa1;font-weight:600}
+.metric.armed span{color:var(--armed);font-weight:600}
+.metric.stale span{color:var(--dim);font-style:italic}
+.stale-note{grid-column:1/-1;margin:0;padding:8px 10px;background:#1b2a36;border-left:3px solid var(--crit);border-radius:4px;color:#d6e1e9}
+.charts{display:grid;grid-template-columns:1fr;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
 .chart{margin:0;position:relative;min-width:0}
 .chart figcaption{display:flex;justify-content:space-between;font-size:10px;color:#8da6b8;letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px}
-.chart .now{color:#e5edf4;font-size:12px;letter-spacing:0;text-transform:none;font-variant-numeric:tabular-nums}
+.chart .now{color:var(--text);font-size:12px;letter-spacing:0;text-transform:none;font-variant-numeric:tabular-nums}
 .chart svg{width:100%;height:74px;display:block;background:#0d1720;border-radius:4px;touch-action:none}
 .chart .grid{stroke:#253848;stroke-width:1;vector-effect:non-scaling-stroke}
 .chart .axis{fill:#8da6b8;font-size:10px}
 .chart .empty{fill:#7f97a9;font-size:11px}
 .chart .cross{stroke:#c9d6df;stroke-width:1;stroke-dasharray:2 2;vector-effect:non-scaling-stroke}
-.chart .tip{position:absolute;top:18px;background:#152938;border:1px solid #385466;border-radius:4px;padding:2px 6px;font-size:11px;white-space:nowrap;pointer-events:none}
-.events{border-top:1px solid #293e4e}
-.events summary,.telemetry summary{padding:12px 18px;cursor:pointer;font-size:12px;color:#b1c3d0}
-.log{list-style:none;margin:0;padding:0 18px 14px;max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:6px}
-.log li{display:grid;grid-template-columns:70px 1fr auto;gap:8px;font-size:12px;color:#c4d3de;align-items:baseline}
+.chart .tip{position:absolute;top:18px;background:#152938;border:1px solid var(--line2);border-radius:4px;padding:2px 6px;font-size:11px;white-space:nowrap;pointer-events:none}
+.mission{padding:10px 0;border-top:1px solid var(--line);font-size:12px;line-height:1.8;color:#b1c3d0;white-space:pre-line}
+.details{padding:0 0 4px;font-size:11px;color:#91a7b9;line-height:1.6;overflow-wrap:anywhere}
+.placeholder{padding:16px 0;color:#92a9bb;font-size:13px;line-height:1.7}
+
+/* ---------- Messages ---------- */
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.log li{display:grid;grid-template-columns:62px 1fr auto;gap:2px 8px;font-size:12px;color:#c4d3de;align-items:baseline;padding:5px 6px;border-radius:4px}
+.log li:nth-child(odd){background:#111e28}
+.log li .who{grid-column:1;font-size:10px;font-weight:600}
 .log b{font-size:9px;letter-spacing:.6px;color:#8da6b8}
-.log li.lvl-critical b{color:#ff9aa1}
-.log li.lvl-warning b{color:#ffd68a}
-.log li.lvl-notice b{color:#97d8bc}
-.log time{font-size:10px;color:#7f97a9;white-space:nowrap}
-.heading-arrow{pointer-events:none}
-.card:fullscreen .charts,.card:fullscreen .events{display:none}
-@media(max-width:720px){.charts{grid-template-columns:1fr}#alerts{flex-direction:column}}
-/* Phones: one aircraft card per row so alerts and readings are not squeezed. */
-@media(max-width:560px){.workspace #fleet{grid-template-columns:1fr}.workspace .head{min-height:0}}
-.map-options label{font-size:12px;color:#aec0cd;white-space:nowrap}.map-options label[hidden]{display:none}.map-options input{accent-color:#79d7b9;vertical-align:middle}
-.command-preview{margin-top:16px;padding-top:16px;border-top:1px solid #385466;display:grid;gap:10px}
-.workflow-drawer{margin-top:14px;border-top:1px solid #385466;padding-top:12px}.workflow-drawer>summary{cursor:pointer;font-size:13px;color:#c6d8e3}.workflow-drawer>summary span{color:#ffd68a;font-size:10px;margin-left:12px}.workflow-drawer .command-preview{border:0;margin-top:12px;padding-top:0}
+.log li.lvl-critical b{color:#ff9aa1}.log li.lvl-warning b{color:#ffd68a}.log li.lvl-notice b{color:#97d8bc}
+.log time{font-size:10px;color:var(--dim);white-space:nowrap}
+
+/* ---------- Layers & help ---------- */
+.opt-row{display:grid;gap:8px}
+.opt-row label,.al-controls label{font-size:12px;color:#c6d6e1;display:flex;gap:8px;align-items:center}
+.opt-row label[hidden]{display:none}
+.opt-row input,.al-controls input{accent-color:#79d7b9}
+.al-controls{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:6px}
+#al-detail-status{font-size:11px}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;margin:0;font-size:12px;align-items:center}
+.keys dt{white-space:nowrap}.keys dd{margin:0;color:#c4d3de}
+.panel[data-panel="help"] p{margin-bottom:8px}
+
+/* ---------- Command preview (unchanged behaviour) ---------- */
+.command-preview{display:grid;gap:10px}
 .preview-heading,.preview-buttons{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.preview-heading{justify-content:space-between}.preview-heading h2{margin:0}.preview-heading strong{color:#ffd68a;font-size:10px;letter-spacing:1px}
-.preview-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.preview-heading{justify-content:space-between}.preview-heading h2{margin:0;font-size:15px}.preview-heading strong{color:#ffd68a;font-size:10px;letter-spacing:1px}
+.preview-fields{display:grid;grid-template-columns:1fr;gap:10px}
 .command-preview label{display:grid;gap:6px;color:#b1c3d0;font-size:12px;min-width:0}
-.command-preview select,.command-preview input{width:100%;background:#0d1720;color:#e5edf4;border:1px solid #385466;border-radius:6px;padding:10px;font:inherit;min-width:0}
-.command-preview select:focus-visible,.command-preview input:focus-visible{outline:2px solid #8ce7c9}
-.command-preview [hidden]{display:none}.command-preview button:disabled,.command-preview select:disabled{opacity:.5;cursor:default}
+.command-preview select,.command-preview input{width:100%;background:#0d1720;color:var(--text);border:1px solid var(--line2);border-radius:6px;padding:9px;font:inherit;min-width:0}
+.command-preview select:focus-visible,.command-preview input:focus-visible{outline:2px solid var(--accent)}
+.command-preview [hidden]{display:none}.command-preview select:disabled{opacity:.5;cursor:default}
 .preview-point{display:grid;gap:8px}.preview-point>strong{font-size:12px;color:#b1c3d0}
 .preview-review{border:1px solid #b99a55;background:#302713;border-radius:6px;padding:12px;display:grid;gap:12px}.preview-review p{color:#ffe3aa}
-#preview-result{color:#b5e7d5;min-height:20px}.card.preview-selected{outline:2px solid #ffd68a;outline-offset:2px}
-.candidate-pin{display:grid;place-items:center;border:2px solid #ffd68a;border-radius:50%;background:#302713;color:#ffe3aa;font-size:24px;box-shadow:0 0 0 3px #0a101799}
-#map.pick-point,.pick-point .leaflet-interactive{cursor:crosshair}
-@media(max-width:560px){.preview-fields{grid-template-columns:1fr}}
+#preview-result{color:#b5e7d5;min-height:20px}
 
-/* Make aircraft positions the primary dashboard panel. */
-.workspace .mapbox{border-color:#466477;box-shadow:0 8px 28px #0004}
-.workspace .map-heading h2{font-size:22px;letter-spacing:-.3px}
-.workspace #map{border:1px solid #3b5667}
-@media(max-width:720px){.workspace .map-heading h2{font-size:19px}}
+/* ---------- Smaller screens ---------- */
+@media(max-width:1500px){.top-actions .tbtn span{display:none}}
+@media(max-width:1100px){
+  :root{--top:76px}
+  .brand{display:none}
+  .tile{min-width:200px}
+  .map-tools span{display:none}
+  .videos[data-size="l"]{--pip-w:380px}
+}
+@media(max-width:720px){
+  :root{--top:72px;--rail:50px;--status:26px}
+  .topbar{padding:4px 6px;gap:6px}
+  .tile{min-width:168px;padding:4px 6px 4px 8px}
+  .tile-vals{gap:7px;font-size:10px}
+  .tile-acts,.tile-name kbd{display:none}
+  .clock{display:none}
+  .tbtn{padding:6px 7px}
+  .rail{left:6px;top:6px}
+  .rail button{width:44px;padding:6px 2px 4px}
+  .rail button span{display:none}
+  .drawer{left:0;right:0;top:auto;bottom:0;width:auto;max-width:none;height:58%;border-radius:12px 12px 0 0}
+  .videos[data-size]{--pip-w:180px}
+  .vhud{font-size:10px;gap:6px}
+  .vwin:not(.main) .vhud>:nth-child(n+3){display:none}
+  .vbar .vrate{display:none}
+  .statusbar{gap:10px;font-size:10px}
+  .statusbar .ro,#cursor-range,#connection{display:none}
+  .stage:not([data-main="map"]){--map-pip-w:200px}
+  .map-chip{max-width:calc(100% - 130px)}
+}
