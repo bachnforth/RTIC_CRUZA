@@ -11,7 +11,9 @@
 <script src="/alabama-map.js" defer></script>
 <script src="/fleet-map.js" defer></script>
 <script src="/fleet.js" defer></script>
-<script src="/command-preview.js" defer></script>
+<script src="/command-workflow.js" defer></script>
+<script src="/observations.js" defer></script>
+<script src="/handover.js" defer></script>
 <script src="/tools.js" defer></script>
 </head>
 <body>
@@ -73,7 +75,9 @@
       <button data-panel="messages" title="Messages from all aircraft (M)"><svg class="i"><use href="#i-chat"/></svg><span>Messages</span><em id="msg-unread" hidden></em></button>
       <button data-panel="layers" title="Map layers (L)"><svg class="i"><use href="#i-layers"/></svg><span>Layers</span></button>
       <button id="measure-tool" data-tool="measure" title="Range &amp; bearing between two points (R)"><svg class="i"><use href="#i-ruler"/></svg><span>Measure</span></button>
-      <button data-panel="preview" title="Command workflow preview — nothing is transmitted (C)"><svg class="i"><use href="#i-target"/></svg><span>Preview</span></button>
+      <button data-panel="handover" title="Mission handover: approve or deny observer cues (O)"><svg class="i"><use href="#i-target"/></svg><span>Handover</span><em id="handover-count" hidden></em></button>
+      <button data-panel="aoi" title="Areas of interest from the observers (I)"><svg class="i"><use href="#i-center"/></svg><span>Areas</span></button>
+      <button data-panel="preview" title="Command workflow (C)"><svg class="i"><use href="#i-plane"/></svg><span>Command</span></button>
       <button data-panel="help" title="Shortcuts and notes (?)"><svg class="i"><use href="#i-help"/></svg><span>Help</span></button>
     </nav>
 
@@ -120,20 +124,31 @@
       </section>
 
       <section class="panel" data-panel="preview" hidden>
-        <section id="command-preview" class="command-preview" aria-labelledby="preview-title">
-          <div class="preview-heading"><h2 id="preview-title">Command workflow</h2><strong>PREVIEW ONLY</strong></div>
-          <p>No aircraft commands are transmitted. Menus illustrate the workflow; platform capabilities have not been verified.</p>
-          <div class="preview-fields">
-            <label>1 · Platform<select id="preview-platform"><option value="">Choose an aircraft…</option><option value="cruza">Cruza · fixed wing</option><option value="quadpi">quadpi · quad</option><option value="rn03" disabled>TFW drone · not configured</option></select></label>
-            <label>2 · Command<select id="preview-command" disabled><option value="">Choose an action…</option></select></label>
-          </div>
-          <p id="preview-action-note"></p>
-          <div class="preview-point"><strong>3 · Location, when needed</strong><p id="preview-destination"></p><div class="preview-buttons"><button id="preview-pick" type="button">Pick point on map</button><button id="preview-clear" type="button" disabled>Clear point</button></div><p id="preview-point-note"></p></div>
-          <label id="preview-altitude-label" hidden>Altitude · m relative to home<input id="preview-altitude" type="number" min="0" step="any" inputmode="decimal" aria-describedby="preview-altitude-note" placeholder="Enter altitude"></label><p id="preview-altitude-note"></p>
-          <button id="preview-build" type="button" disabled>4 · Review preview</button>
-          <div id="preview-review" class="preview-review" hidden><p id="preview-summary"></p><div class="preview-buttons"><button id="preview-confirm" type="button" disabled>Complete preview · no transmission</button><button id="preview-cancel" type="button">Back to editing</button></div></div>
-          <p id="preview-result" role="status" aria-live="polite"></p>
-        </section>
+        <section id="command-workflow" class="command-preview" aria-labelledby="wf-title">
+  <div class="preview-heading"><h2 id="wf-title">Command workflow</h2><strong id="wf-mode">PREVIEW ONLY</strong></div>
+  <p id="wf-intro"></p>
+  <div class="preview-fields">
+    <label>1 · Platform<select id="wf-platform"><option value="">Choose an aircraft…</option><option value="cruza">Cruza</option><option value="quadpi">quadpi</option><option value="rn03">TFW drone</option></select></label>
+    <label>2 · Command<select id="wf-command" disabled><option value="">Choose a command…</option></select></label>
+  </div>
+  <p id="wf-state" role="status" hidden></p>
+  <div id="wf-quick" class="wf-quick" hidden><strong>Immediate · one click, no review</strong><div class="preview-buttons"><button data-action="hold" type="button">Hold (BRAKE)</button><button data-action="rtl" type="button">RTL</button><button data-action="land" type="button">Land</button></div></div>
+  <p id="wf-action-note"></p>
+  <div class="preview-point"><strong>3 · Location, when needed</strong><p id="wf-destination"></p><div class="preview-buttons"><button id="wf-pick" type="button">Pick point on map</button><button id="wf-clear" type="button" disabled>Clear point</button></div><p id="wf-point-note"></p></div>
+  <label id="wf-altitude-label" hidden>Altitude · m relative to home<input id="wf-altitude" type="number" min="0" step="any" inputmode="decimal" aria-describedby="wf-altitude-note" placeholder="Enter altitude"></label><p id="wf-altitude-note"></p>
+  <button id="wf-build" type="button" disabled>4 · Review preview</button>
+  <div id="wf-review" class="preview-review" hidden><p id="wf-summary"></p><div class="preview-buttons"><button id="wf-confirm" type="button" disabled>Complete preview · no transmission</button><button id="wf-cancel" type="button">Back to editing</button></div></div>
+  <p id="wf-result" role="status" aria-live="assertive"></p>
+  <ol id="wf-log" class="wf-log" aria-label="Recent commands for this aircraft"></ol>
+</section>
+      </section>
+
+      <section class="panel" data-panel="handover" hidden>
+        <section id="mission-handover" class="handover-panel" aria-labelledby="handover-title"><div class="aoi-heading"><h2 id="handover-title">Mission handover</h2><strong>OPERATOR DECISION</strong></div><p>Each geolocated observer cue waits here with its image for your decision. Approving records the decision. For an aircraft with a live point-command link it also prefills that aircraft's command workflow, where nothing is sent until you review and send it; for any other aircraft it is <strong>decision only</strong>: the approved point is marked on the map for the safety pilot and no command path exists. Every decision is logged.</p><p id="handover-status" role="status" aria-live="polite"></p><ul id="handover-list" class="handover-list"></ul></section>
+      </section>
+
+      <section class="panel" data-panel="aoi" hidden>
+        <section id="areas-of-interest" class="aoi-panel" aria-labelledby="aoi-title"><div class="aoi-heading"><h2 id="aoi-title">Areas of interest</h2><strong>ADVISORY</strong></div><p>Observer cues from across the fleet, for a human look. Each is placed on the ground from the reporting aircraft's own telemetry; when two aircraft report the same thing in the same place, the cue says so. Confirm or dismiss each; nothing is tasked. A confirmed cue can drop its point into the command workflow below; nothing is sent until that workflow is reviewed and sent.</p><p id="aoi-status" role="status" aria-live="polite">Observer not connected.</p><ul id="aoi-list" class="aoi-list"></ul></section>
       </section>
 
       <section class="panel" data-panel="help" hidden>
@@ -144,7 +159,9 @@
           <dt><kbd>M</kbd></dt><dd>Messages</dd>
           <dt><kbd>L</kbd></dt><dd>Map layers</dd>
           <dt><kbd>R</kbd></dt><dd>Measure range &amp; bearing</dd>
-          <dt><kbd>C</kbd></dt><dd>Command preview (nothing is sent)</dd>
+          <dt><kbd>O</kbd></dt><dd>Mission handover</dd>
+          <dt><kbd>I</kbd></dt><dd>Areas of interest</dd>
+          <dt><kbd>C</kbd></dt><dd>Command workflow</dd>
           <dt><kbd>F</kbd></dt><dd>Fit all aircraft on the map</dd>
           <dt><kbd>G</kbd></dt><dd>Center on the selected aircraft</dd>
           <dt><kbd>S</kbd></dt><dd>Swap map and selected aircraft's video</dd>
@@ -156,7 +173,7 @@
         <h3>Reading the map</h3>
         <p class="map-help">Drag to pan · scroll or + / − to zoom · Select an aircraft to center it · Dashed markers show last-known positions, never a live fix. Click the coordinates in the bottom bar to change format.</p>
         <h3>About this view</h3>
-        <p>Read-only. Pilot QGroundControl connections remain independent. No flight controls.</p>
+        <p>Read-only unless a control link is started for an aircraft (the status bar says so). Pilot QGroundControl connections remain independent, and each safety pilot's RC is the override.</p>
         <p>Unknown or stale readings display —. Mission items use the aircraft’s zero-based sequence and do not indicate completion. Full mission routes are unavailable in this passive view.</p>
         <p>Pause stops extra video; telemetry continues. Closing this page stops both optional laptop copies. Video delays differ between aircraft.</p>
       </section>
@@ -176,7 +193,7 @@
   </div>
 
   <footer class="statusbar">
-    <span class="ro" title="This dashboard never sends anything to an aircraft">READ-ONLY · NO FLIGHT CONTROLS</span>
+    <span id="control-state" class="ro" title="Whether this dashboard can send commands to any aircraft">READ-ONLY · NO FLIGHT CONTROLS</span>
     <span id="map-status" role="status">Waiting for telemetry</span>
     <span id="cursor-range" class="dim"></span>
     <button id="cursor-coords" title="Pointer position — click to change format">Move pointer over map</button>

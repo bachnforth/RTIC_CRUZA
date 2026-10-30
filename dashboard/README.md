@@ -44,24 +44,87 @@ phone-width screenshots, keyboard shortcuts, video swap/minimize/pause and the
 preview workflow, with no page errors. Not yet checked against live aircraft
 or the real MediaMTX video.
 
-## Command workflow preview (21 October 2026)
+### With live control and mission handover (30 October 2026)
 
-The map includes a **PREVIEW ONLY** panel: choose a platform, an illustrative
-action, a map point when relevant, and an explicit altitude for destination
-previews, then review and complete the preview locally. A point may also be
-picked first and retained as a candidate. Escape cancels picking; Clear point
-removes the candidate. Changing a selection invalidates the previous review.
-Selecting a platform highlights its card and, when available, its map marker.
+The map-first layout was merged with the live command workflow and mission
+handover from `feature/tfw-drone-control`. In this layout:
 
-RTL uses the configured return location in the preview description, never the
-candidate point. Arm/disarm labels refer to flight motors and ignore the point.
-Fixed-wing landing is omitted; TFW drone is unavailable until configured.
-Menus illustrate interaction only, not verified aircraft capabilities. Preview
-completion never claims a command was accepted or an aircraft changed state.
+- The rail's **Command** button (C) opens the command workflow drawer. It is
+  the live workflow, not the preview, when a control link is started.
+- **Handover** (O) opens the mission handover drawer, which is wider to show
+  the pictures. While a request waits for a decision, the rail button turns
+  amber and shows the count. Each new request opens the drawer and flashes a
+  note on the map. It does not do this while you are typing in the command
+  workflow or have a review open waiting for Send.
+- Approving a card opens the Command drawer at that aircraft's review, as
+  before.
+- **Areas** (I) opens the areas-of-interest list.
+- The bottom bar says **READ-ONLY · NO FLIGHT CONTROLS**, or **LIVE CONTROL**
+  in amber with the aircraft named.
+- The TFW drone has a video window, as quadpi does.
 
-There is **no command API, MAVLink sender, transport, queue or saved command**.
-Nothing in this preview transmits a flight command or changes the Pi bridge.
-Selections are discarded on reload. Video and passive telemetry are unchanged.
+## Mission handover (27–28 October 2026) — tested with the real Cruza on the ground, not yet in flight
+
+The **Mission handover** panel is hidden until a request exists; while one awaits a decision it moves above the map. It lists each geolocated
+observer cue with its image chip, class, confidence, estimated position and
+range, and how recently it was seen. The operator **approves** it for quadpi
+or TFW drone (and picks Fly to point & hold or Loiter) or **denies** it with
+an optional reason. Approval transmits nothing:
+
+- If that aircraft's control link takes a point command (`-QuadControl` /
+  `-TfwControl`), approval prefills its command workflow at the approved point;
+  the altitude, review and Send are still the operator's.
+- Otherwise (no control link, or the arm/disarm-only `-QuadBench` link) it is
+  **decision only**. The decision is recorded and the approved point is marked
+  ◎ on the map, separately from the workflow's selected point, with Show point
+  and Copy coordinates for the safety pilot. No command path exists.
+
+Approval is refused when the position is over 60 s old.
+
+The queue lives on the server (`handover.py`), so all open pages agree.
+Same-class cues within 120 m merge into one request, and a decided request is
+not offered again for 5 minutes. Decisions and expiries go to
+`runtime/handover.log` with the image saved under `runtime/handover/`.
+Images arrive as numbered chip parts inside the taps' existing 512-byte
+records (`handover_intake.py`; the observation store and taps are unchanged).
+Sending them from the Cruza is a proposal for its owner in
+`docs/proposals/cruza-image-chips/`; without it, cards show location only. The message format,
+the bench run and a known placement issue in `swarm.picture()` are in
+[docs/mission-handover-2026-10-27.md](../docs/mission-handover-2026-10-27.md).
+
+## Command workflow (21 October 2026)
+
+Below the map, one **Command workflow** serves every aircraft: 1 · choose a
+platform, 2 · a command, 3 · a map point and/or altitude when the command needs
+them, 4 · review, then send. Each platform is labelled **LIVE** or
+**preview only** in the menu.
+
+- **LIVE** (quadpi when started with `-QuadControl`, TFW drone with
+  `-TfwControl`): the review button reads *Send to <aircraft>*, the review expires after 20 s, and the
+  aircraft's acknowledgement or refusal reason appears below. Hold (BRAKE),
+  RTL and Land are also in an **Immediate** row next to the aircraft's status
+  line; they send on one click without review. That row sits away from the
+  Send button on purpose: during SITL testing a page shift turned a click aimed
+  at Send into Hold when the two were adjacent.
+- **Preview only** (Cruza, and TFW drone without `-TfwControl`): menus illustrate the workflow, a
+  completed preview transmits nothing, and the server refuses any `/control`
+  request for these platforms (HTTP 403).
+
+Changing platform clears the chosen command, so nothing carries over between
+aircraft or from preview to live. Commands the aircraft's current state does
+not allow (for example Disarm in the air) cannot be reviewed and say why. Escape
+cancels point picking; Clear point removes the point. Selecting a platform
+highlights its card and map marker. Fixed-wing landing is left out of Cruza's
+preview menu.
+
+Adding another live platform means a control link for it in `control.py`
+(registered in `server.py`'s `controls`) plus its own reviewed command
+allowlist on that aircraft's companion computer. TFW drone uses the same
+`QuadControl` link and command set as quadpi, through the same filter run as a
+mavlink-router client on its Pi; its owner's install guide is
+[docs/tfw-drone-dashboard-control.md](../docs/tfw-drone-dashboard-control.md)
+and the files are in `partner/tfw-drone/`. Its commands are logged to
+`runtime/tfw-commands.log`.
 
 Open **http://127.0.0.1:8765** on this laptop. Both camera pictures were verified
 in the browser on 2026-10-15. The viewer is local-only and has no flight controls,
@@ -72,6 +135,199 @@ To reopen after stopping/restarting the laptop, double-click
 It uses the existing bundled Python runtime; pass `-PythonPath` if that runtime
 moves. `stop-dashboard.ps1` stops only the laptop viewer and its extra streams.
 No administrator privileges are needed to launch it.
+
+## quadpi click-to-fly control (21 October 2026) — SITL-tested only
+
+**Not yet installed on quadpi or flown.** Off unless the dashboard is started
+with `-QuadControl host:port`; without it nothing below is active and the page
+stays read-only.
+
+quadpi's live commands in the workflow:
+**Arm & take off** to 1–120 m (switches to GUIDED, arms, takes off),
+**Fly to point & hold** picked on the map at 1–120 m (within 1 km of the quad),
+**Loiter (circle)**, **Hold** (BRAKE, ignores the Pocket's sticks), **RTL**,
+**Land here**, **Arm motors (current mode)** and **Disarm** on the ground.
+Each step waits for the
+aircraft's acknowledgement, is never retried, and shows the refusal reason
+(including recent PreArm text). Every action is appended to the ignored
+`runtime/quad-commands.log`. Cruza stays read-only.
+
+`control.py` talks directly to the quadpi bridge's UDP command port
+(`safety_mavlink_filter.py`, sibling 10 inch Quad project) and also supplies the
+quadpi card's telemetry while enabled. While a page is open it sends a 1 Hz GCS
+heartbeat and, if no position arrives, the same stream requests the bridge
+already permits. Closing every page stops the heartbeat; with
+`FS_GCS_ENABLE` set the quad then fails safe unless another GCS (phone QGC) is
+still sending heartbeats.
+
+The bridge passes only these exact shapes to system 1 / component 1: arm or
+disarm with param2 = 0 (never forced), mode GUIDED/LOITER/RTL/LAND/BRAKE, takeoff
+to 1–120 m, and DO_REPOSITION (relative altitude, default speed, change-mode flag,
+no yaw) to 1–120 m. Parameter writes, forced arm/disarm, other modes, RC
+overrides, manual control, servo/actuator commands, flight termination and any
+change to the safety-device command stay blocked. FC traffic is now copied to
+up to four senders heard in the last 5 s, so phone QGC and the dashboard both
+receive acknowledgements. The safety device is not controllable from the dashboard.
+
+### SITL validation (21 October 2026)
+
+Mission Planner's ArduCopter SITL ran behind the real modified bridge
+(`--serial tcp:127.0.0.1:5762 --udp-listen 14551`) and the dashboard was started
+with `-QuadControl 127.0.0.1:14551`. In the browser: arm & take off to 10 m,
+fly to a point 100 m north (arrived within 0.1 m), Hold, RTL (landed at home and
+auto-disarmed), take off to 5 m and Land (landed and disarmed). The dashboard
+refused an in-air disarm; a normal in-air disarm sent straight to the bridge was
+refused by the FC (`FAILED`), and a forced disarm was dropped by the bridge
+(counted as blocked; the aircraft stayed armed). With `FS_GCS_ENABLE=1` on the
+simulator, shutting the dashboard down mid-hover produced RTL 4.3 s later.
+Tests: 19 bridge tests (allow/deny shapes, peers) and 37 dashboard tests,
+including 8 control-link tests against a fake bridge.
+
+The same flights were repeated through the rebuilt Command workflow: takeoff to
+10 m, fly to a point 100 m east at 15 m (arrived within 0.3 m), Hold, RTL to a
+landing and auto-disarm, takeoff to 5 m and Land. A Cruza preview completed
+without transmitting, and `/control` returned 403 for Cruza and for requests
+without a platform. Disarm could not be reviewed while airborne.
+
+On Windows the bridge needs a listener on its `--udp-target`, otherwise
+Windows' UDP reset behaviour applies; a departed peer no longer crashes it.
+
+### Loiter (circle) (27 October 2026) — SITL-tested only
+
+Loiter flies the FC's own circle: radius `CIRCLE_RADIUS_M` (or `CIRCLE_RADIUS`
+in cm), direction from the sign of `CIRCLE_RATE` (positive = clockwise). The
+dashboard reads these with `PARAM_REQUEST_READ` and never writes them. With no
+map point it switches straight to CIRCLE around where the quad is. With a map
+point (and an altitude) it flies there in GUIDED and switches to CIRCLE once
+within 3 m; any other command, a mode change from the Pocket or QGC, landing,
+or 5 minutes without arriving cancels that pending switch.
+
+- CIRCLE takes climb/descent from the Pocket throttle, so Loiter is refused
+  unless the throttle (`RCMAP_THROTTLE`, from `RC_CHANNELS`) reads 1400–1600 µs.
+- ArduCopter centres the circle one radius *ahead* of the aircraft unless
+  `CIRCLE_OPTIONS` has bit 4 ("start at centre"). The review says which will
+  happen. Setting that bit is a one-time FC change for the owner; quadpi's
+  value has not been read yet.
+- The bridge allowlist gains only DO_SET_MODE CIRCLE (7).
+
+SITL, 27 October (filter + dashboard, a stand-in holding the "Pocket" throttle
+via RC override): takeoff to 10 m; Loiter refused with throttle at 1000 µs;
+with throttle centred and `CIRCLE_OPTIONS`=1, Loiter here flew a 10.0 m circle
+at a steady 10.0 m whose centre was 10.0 m from the entry point (as warned);
+with `CIRCLE_OPTIONS`=5, Loiter at a point 80 m away at 15 m flew there,
+logged "Arrived; circling" and flew a 10.0 m circle at 15.0 m centred 2.3 m
+from the chosen point; RTL landed at home and disarmed; takeoff to 5 m and
+Land landed and disarmed; Arm (STABILIZE) then Disarm both accepted. The
+bridge passed 430 messages to the FC and blocked none. ArduCopter refuses
+GUIDED arming unless the throttle is low ("Throttle (RC3) is not neutral"), so
+the pilot centres it only after takeoff, before Loiter. 52 dashboard tests and
+19 bridge tests pass.
+
+### Arm & fly mission (27 October 2026) — SITL-tested only
+
+**Arm & fly mission** launches the waypoint mission already loaded on quadpi
+(uploaded from QGC or Mission Planner as before) straight from the ground:
+GUIDED → arm → `MISSION_START` (whole mission), each step acknowledged before
+the next. ArduCopter accepts `MISSION_START` even while disarmed, so it is only
+sent after the arm has been accepted. The mission's own `NAV_TAKEOFF` lifts off;
+the Pocket throttle stays low (GUIDED arming needs it low) and `AUTO_OPTIONS`
+does not need changing.
+
+While quadpi is on the ground the dashboard reads the mission (MISSION_REQUEST_*
+only, never an upload) every 2 minutes and immediately after the FC announces
+"Flight plan received". The review lists the item count, takeoff height,
+highest altitude, farthest distance from home and the final command, and the
+route is drawn on the map (dashed yellow). At Send the server re-reads the
+mission and refuses if it no longer matches what was reviewed. A launch is
+refused unless the first navigation item is a takeoff, the highest altitude is
+at most 120 m and nothing is more than 1.5 km from home. Hold (BRAKE), RTL and
+Land take over mid-mission; the Pocket mode switch overrides everything, and
+its AUTO position (6) resumes the mission. With `FS_OPTIONS`=1 a GCS link loss
+lets the mission continue.
+
+The bridge allowlist gains only `MISSION_START` with all parameters 0
+(starting at a chosen item, AUTO by mode change and `DO_SET_MISSION_CURRENT`
+stay blocked).
+
+SITL, 27 October (simulator at quadpi's home, quadpi's own 63-item mission
+uploaded through the bridge): the dashboard read it in ~2 s (takeoff 30 m,
+highest 50 m, farthest 464 m, ends with RTL); Arm & fly mission from the
+workflow armed in GUIDED, switched to AUTO, climbed to 30.0 m, then flew south
+at the mission's 5 m/s and climbed toward 50 m; Hold stopped it at 50 m
+(0.1 m/s), RTL brought it home. The bridge blocked nothing. Note: Tailscale
+holds UDP 14551 on this laptop, so the local SITL bridge listened on 14561.
+
+### Before using it on the real quad (phase 2, props off, then phase 3)
+
+1. Back up the live bridge on quadpi, install the new `safety_mavlink_filter.py`,
+   restart only `safety-mavlink-filter` at the bench and run its tests there.
+2. Back up FC parameters, then set `FS_GCS_ENABLE` (RTL or Land) and confirm a
+   geofence (`FENCE_ENABLE` was 0 in the September snapshots). Keep RC failsafe
+   and the Pocket's flight-mode switch unchanged.
+3. Start with `start-dashboard.ps1 -QuadControl 10.223.79.20:14551`, props off:
+   check every button's acknowledgement and refusal, and both failsafes.
+4. First flight: short hover with a safety pilot on the Pocket.
+
+### Bench arm test (props off)
+
+**Arm motors (current mode)** arms in whatever mode the Pocket's switch selects
+(STABILIZE on positions 3/4 needs no GPS): no mode change, no takeoff. The
+review shows the current mode. The FC still runs every pre-arm check and a
+refusal shows its reason; on the ground it disarms itself after
+`DISARM_DELAY` (10 s). SITL, 26 October: armed in STABILIZE with no mode
+change and auto-disarmed about 10 s later; armed then disarmed from the
+workflow; with an impossible `BATT_ARM_VOLT` the panel showed "Arm refused
+(FAILED): Arm: Battery 1 below minimum arming voltage".
+
+1. Props off. Pocket on, throttle low, mode switch on STABILIZE. Power quadpi
+   and the mesh. If the laptop rebooted, run `fix-mesh-routes.ps1` as
+   administrator.
+2. Copy the filter package from the 10 inch Quad project to the Pi:
+   ```powershell
+   $pi = "$HOME\Documents\ChatGPT\10 inch Quad\safety-arbiter\pi"
+   ssh -i $HOME\.ssh\id_ed25519_rpi -o HostKeyAlias=10.223.79.20 ebach@10.223.79.20 'mkdir -p ~/dashboard-filter-install'
+   scp -i $HOME\.ssh\id_ed25519_rpi -o HostKeyAlias=10.223.79.20 "$pi\install-dashboard-filter.sh" "$pi\safety_mavlink_filter.py" "$pi\test_flight_commands.py" "$pi\test_telemetry_startup.py" ebach@10.223.79.20:dashboard-filter-install/
+   ```
+3. On the Pi (`ssh ... ebach@10.223.79.20`):
+   ```sh
+   cd ~/dashboard-filter-install && sed -i 's/\r$//' *.sh *.py && chmod +x install-dashboard-filter.sh
+   ./install-dashboard-filter.sh status
+   sudo ./install-dashboard-filter.sh install --bench
+   ```
+   `status` reports which filter version is live. `install` refuses an unknown
+   version (it prints the diff and the `--accept-live-sha` to use if only the
+   dashboard change differs), runs the tests with the service's own Python,
+   backs up to `/var/backups/quadpi/dashboard-filter-<time>/`, restarts only
+   `safety-mavlink-filter` and restores the backup by itself if the service
+   does not stay up. Undo with `sudo ./install-dashboard-filter.sh rollback --bench`.
+4. On the laptop: `start-dashboard.ps1 -QuadControl 10.223.79.20:14551` (stop
+   the read-only dashboard first). Command workflow → quadpi → Arm motors
+   (current mode) → review → Send. Then Disarm from the workflow, and once
+   more check that the Pocket can disarm.
+
+**What actually ran on 27 October.** quadpi's `safety-mavlink-filter` service
+was found running a different, uncommitted bridge installed on 21 October:
+drop-in `70-dashboard-bench.conf` starts `/opt/quadpi-dashboard-bench/bridge.py`
+with a loopback TCP bench port (15760) that accepts, from GCS 254/190 only,
+on-ground arm/disarm, GUIDED/STABILIZE while disarmed, a few 2 Hz telemetry
+requests and four failsafe parameters. The install script above refuses this
+(its live file is not `safety_mavlink_filter.py`); installing our filter means
+backing up and removing that drop-in first. The owner chose to keep it, so the
+dashboard gained `start-dashboard.ps1 -QuadBench 10.223.79.20`: an SSH tunnel
+to the bench port, GCS ID 254, Arm and Disarm only.
+
+Results: arm and disarm from the workflow were accepted by quadpi (11:13:59 /
+11:14:15 by Claude, 11:17:50 / 11:17:59 by the owner), confirmed by the FC's
+"ARMED"/"Disarmed" messages. Earlier attempts failed: over Tailscale (relayed
+via DERP, ~2 s each way) the FC refused with "PreArm: GCS failsafe on"; on the
+mesh, quadpi at 84.9 °C and throttling (`0x60006`) lost most telemetry even
+with no commands. After cooling (≈62–72 °C, `throttled=0x0`) a 3-minute
+command-free test received 180/180 heartbeats with no gaps. quadpi only joins
+the mesh when RN08's USB link enumerates (LAN9500A as `eth0`, profile `mini`,
+10.223.79.20/16); reseating the cable and power-cycling fixed it. The laptop
+reached the mesh through RN20's Wi-Fi "Carp" on Wi-Fi 2. The FC reported "GPS
+Glitch or Compass error" and "EKF variance" on the bench; check before flight.
+Keep quadpi cooled whenever the camera runs.
 
 ## How to use it
 
@@ -572,3 +828,39 @@ Validation: 29 Python decoder/session/TCP-reader checks and the map checks
 passed. Browser checks verified equal card widths, aligned camera areas and the
 larger full-width map. TFW drone's heartbeat, position, battery and mission
 status were verified live; this does not establish flight readiness.
+
+## Areas of interest (observer cues) — 23 October 2026
+
+The dashboard now shows advisory areas of interest from the Cruza observer, so
+the operator can cue an agile mesh platform (quadpi, TFW drone) to go look. The
+chain is deliberately human-gated end to end:
+
+1. The Cruza `observe.py` detector publishes advisory detections (angles off the
+   camera boresight) over a loopback tap. `server.py` reads them over SSH into a
+   validated, expiring `ObservationStore` (`observations.py`) and exposes them in
+   `/status` as `observations`. The reader shares the telemetry viewer lease and
+   writes nothing to the aircraft.
+2. `observations.js` joins each detection with the Cruza's live telemetry
+   (heading, pitch, relative altitude) to estimate a bearing and a rough ground
+   point, and lists it in the **Areas of interest** panel with class, confidence,
+   bearing, estimated range and age.
+3. The operator **Confirms** or **Dismisses** each cue. A confirmed cue draws an
+   advisory marker on the map and can be **Sent to dispatch**, which drops a
+   candidate point into the existing command-workflow panel.
+4. Tasking stays exactly as before: **preview only**. Nothing is transmitted to
+   any aircraft, and no detection ever moves one.
+
+The camera mount assumptions used for bearing/range (`MOUNT_YAW_DEG`,
+`MOUNT_PITCH_DOWN_DEG`) are constants at the top of `dist/observations.js`; the
+field of view lives in the Pi observer config. These are cueing estimates, not a
+calibrated sensor line — measure them on the airframe and correct them, and
+treat an estimated location as a starting point to re-pick on the map.
+
+Validation decisions (confirm/dismiss) are local to the page and are discarded on
+reload, like the command preview. Observation records are validated and clamped
+before display; malformed or non-finite fields are dropped. Nine extra decoder
+tests cover this (`test_observations.py`). No observation is written to disk.
+
+The feature is inert until the Cruza detector is enabled on the Pi (see the
+companion README). With the detector off, the panel simply reports the observer
+as not connected.

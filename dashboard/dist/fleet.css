@@ -26,6 +26,8 @@ kbd{font:600 11px/1 "Cascadia Mono",Consolas,monospace;background:#1d2f3c;border
 /* ---------- Overall frame ---------- */
 #app{height:100dvh;display:grid;grid-template-rows:var(--top) auto minmax(0,1fr) var(--status);background:var(--bg)}
 #app:fullscreen{width:100%;height:100%}
+/* Fixed rows: the alert banner is often hidden, and the map must keep row 3 when it is. */
+#app>.topbar{grid-row:1}#app>#alerts{grid-row:2}#app>.stage{grid-row:3}#app>.statusbar{grid-row:4}
 
 /* ---------- Top bar & aircraft tiles ---------- */
 .topbar{display:flex;align-items:stretch;gap:10px;padding:6px 10px;background:linear-gradient(#0f1a24,#0b141c);border-bottom:1px solid var(--line);min-width:0}
@@ -268,6 +270,64 @@ kbd{font:600 11px/1 "Cascadia Mono",Consolas,monospace;background:#1d2f3c;border
 .preview-point{display:grid;gap:8px}.preview-point>strong{font-size:12px;color:#b1c3d0}
 .preview-review{border:1px solid #b99a55;background:#302713;border-radius:6px;padding:12px;display:grid;gap:12px}.preview-review p{color:#ffe3aa}
 #preview-result{color:#b5e7d5;min-height:20px}
+
+
+.command-preview.wf-live{border:1px solid #4d7a5c;border-radius:8px;background:#0f2019;padding:14px}
+.command-preview.wf-live #wf-mode{color:#ff9a7a}
+#wf-state{margin:0;font-weight:600}#wf-state.wf-armed{color:#ff9a7a}
+.wf-quick{display:grid;gap:8px;border:1px solid #6b5a2e;border-radius:6px;padding:10px;background:#1d1a10}.wf-quick>strong{font-size:12px;color:#ffd68a}
+.wf-quick button:not(:disabled){border-color:#ffd68a;color:#ffd68a;min-width:110px}
+#wf-result{min-height:20px;color:#b5e7d5}#wf-result.failed,.wf-log .failed{color:#ff9a7a}#wf-result.ok,.wf-log .ok{color:#7ce1ba}
+.wf-log{margin:0;padding-left:18px;font-size:12px;display:grid;gap:2px}
+/* Areas of interest (advisory observer cues) */
+.aoi-panel{display:grid;gap:8px}
+.aoi-heading{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.aoi-heading h2{margin:0}.aoi-heading strong{color:#8ce7c9;font-size:10px;letter-spacing:1px}
+#aoi-status{color:#9bcdbb}
+.aoi-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.aoi{background:#0d1720;border:1px solid #2c4556;border-radius:6px;padding:10px 12px;display:grid;gap:7px}
+.aoi-confirmed{border-color:#7ce1ba;box-shadow:0 0 0 1px #7ce1ba55}
+.aoi-dismissed{opacity:.5}
+.aoi-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.aoi-head strong{font-size:14px;text-transform:capitalize}
+.aoi-score{font-variant-numeric:tabular-nums;color:#8ce7c9;font-size:13px}
+.aoi-head{flex-wrap:wrap}
+.aoi-src{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#9fb3c8;border:1px solid #33475b;border-radius:3px;padding:1px 5px}
+.aoi-cross{font-size:11px;color:#ffd479;flex-basis:100%}
+.aoi-detail{font-size:11px;color:#9bb1c1;line-height:1.6}
+.aoi-actions{display:flex;gap:8px;flex-wrap:wrap}
+.aoi-actions button{padding:6px 10px;font-size:11px}
+.aoi-actions .aoi-dismiss{border-color:#5a4a4a;color:#e0c7c7}
+.aoi-pin{display:grid;place-items:center;color:#8ce7c9;font-size:20px;text-shadow:0 0 4px #0a1017,0 0 2px #0a1017}
+/* Mission handover (operator approve/deny of observer cues) */
+.handover-panel{display:grid;gap:8px}
+#handover-status{color:#9bcdbb;margin:0}
+.handover-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.ho{display:grid;grid-template-columns:160px 1fr;gap:12px;background:#0d1720;border:1px solid #2c4556;border-radius:6px;padding:10px 12px}
+.ho-pending{border-color:#ffd479;box-shadow:0 0 0 1px #ffd47955}.ho-approved{border-color:#7ce1ba}.ho-denied,.ho-expired{opacity:.6}
+.ho-figure{display:grid;place-items:center;min-height:110px;background:#071017;border:1px solid #22384a;border-radius:4px;overflow:hidden}
+.ho-figure img{width:100%;height:auto;display:block;image-rendering:auto}.ho-figure [hidden]{display:none}
+.ho-noimage{font-size:11px;color:#7f97aa;padding:8px;text-align:center}
+.ho-body{display:grid;gap:6px;min-width:0}
+.ho-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}.ho-head strong{font-size:14px;text-transform:capitalize}
+.ho-state{margin-left:auto;font-size:10px;letter-spacing:1px;color:#ffd479}.ho-approved .ho-state{color:#7ce1ba}.ho-denied .ho-state,.ho-expired .ho-state{color:#c9a8a8}
+.ho-detail{margin:0;font-size:11px;color:#9bb1c1;line-height:1.5;overflow-wrap:anywhere}
+.ho-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ho-actions button,.ho-actions select{padding:6px 10px;font-size:11px}
+.ho-approve:not(:disabled){border-color:#7ce1ba;color:#7ce1ba}.ho-deny{border-color:#5a4a4a;color:#e0c7c7}
+.ho-message{margin:0;font-size:11px;min-height:14px;color:#c6d8e3}.ho-message.ok{color:#7ce1ba}.ho-message.failed{color:#ff9a7a}
+@media (max-width:560px){.ho{grid-template-columns:1fr}}
+.handover-pin{display:grid;place-items:center;color:#ffd479;font-size:22px;text-shadow:0 0 4px #0a1017,0 0 2px #0a1017}
+.ho-decision-only .ho-state{color:#ffd479}.ho-coords{font-variant-numeric:tabular-nums;color:#ffd479;font-size:12px;margin:0}
+/* Handover in the side drawer: wider for the pictures; the rail button pulses while a request awaits a decision. */
+.drawer.wide{width:580px}.drawer.wide .ho{grid-template-columns:220px 1fr}
+@media(max-width:720px){.drawer.wide{width:auto}.drawer.wide .ho{grid-template-columns:1fr}}
+.rail button.ho-alert{border-color:#ffd479;color:#ffd479;background:#2a2410}
+.rail em#handover-count{background:#ffd479;color:#1a1608}
+.rail button.ho-alert em{animation:ho-pulse 1.4s ease-in-out infinite}
+@keyframes ho-pulse{50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.rail button.ho-alert em{animation:none}}
+/* Live control: the status bar says so, in amber. */
+.statusbar .ro.ro-live{color:#ffd68a}
 
 /* ---------- Smaller screens ---------- */
 @media(max-width:1500px){.top-actions .tbtn span{display:none}}

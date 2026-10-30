@@ -6,7 +6,7 @@
 const AIRCRAFT = [
   {id: 'cruza', name: 'Cruza', route: 'Fixed wing · LTE / VPN', color: '#7ce1ba', video: true, fixedWing: true},
   {id: 'quadpi', name: 'quadpi', route: '10-inch quad · wearable radio / mesh', color: '#7dbcf4', video: true},
-  {id: 'rn03', name: 'TFW drone', route: '10-inch quad · wearable radio / mesh', color: '#d3a9ed', video: false},
+  {id: 'rn03', name: 'TFW drone', route: '10-inch quad · wearable radio / mesh', color: '#d3a9ed', video: true},
 ];
 const byId = Object.fromEntries(AIRCRAFT.map(a => [a.id, a]));
 const names = Object.fromEntries(AIRCRAFT.map(a => [a.id, [a.name, a.route]]));
@@ -410,11 +410,14 @@ function centerOn(id) {
   if (!window.fleetMap?.focusAircraft?.(id)) flash(`${byId[id].name} has no position to center on yet`);
 }
 
-const PANEL_TITLES = {aircraft: 'Aircraft', messages: 'Messages', layers: 'Map layers', preview: 'Command workflow · preview only', help: 'Help & shortcuts'};
+const PANEL_TITLES = {aircraft: 'Aircraft', messages: 'Messages', layers: 'Map layers', preview: 'Command workflow', handover: 'Mission handover',
+  aoi: 'Areas of interest', help: 'Help & shortcuts'};
 function openPanel(name, keepOpen = false) {
   if (openPanelName === name && !keepOpen) { closeDrawer(); return; }
   openPanelName = name;
   $('#drawer').hidden = false;
+  // Handover cards carry a picture: give them a wider drawer.
+  $('#drawer').classList.toggle('wide', name === 'handover');
   $('#drawer-title').textContent = PANEL_TITLES[name];
   for (const p of document.querySelectorAll('.drawer .panel')) p.hidden = p.dataset.panel !== name;
   for (const b of document.querySelectorAll('.rail [data-panel]')) b.classList.toggle('active', b.dataset.panel === name);
@@ -706,6 +709,8 @@ async function tick() {
     renderBanner(status.fleet);
     renderMessages(status.fleet);
     drawMap(status.fleet);
+    document.dispatchEvent(new CustomEvent('fleet-status', {detail: status}));
+    window.observations?.update(status.observations, status.fleet, status.swarm);
     for (const f of status.feeds) {
       const prev = previous[f.name];
       const rate = prev ? Math.round(Math.max(0, f.bytes - prev.bytes) * 8 / (now - prev.time)) : 0;
@@ -772,7 +777,7 @@ document.addEventListener('keydown', e => {
     '2': () => { select('quadpi'); openPanel('aircraft', true); },
     '3': () => { select('rn03'); openPanel('aircraft', true); },
     d: () => openPanel('aircraft'), m: () => openPanel('messages'), l: () => openPanel('layers'),
-    c: () => openPanel('preview'), '?': () => openPanel('help'), h: () => openPanel('help'),
+    c: () => openPanel('preview'), o: () => openPanel('handover'), i: () => openPanel('aoi'), '?': () => openPanel('help'), h: () => openPanel('help'),
     r: () => window.fleetTools?.toggleMeasure(),
     f: () => $('#fit-fleet').disabled ? flash('No aircraft positions to fit yet') : $('#fit-fleet').click(),
     g: () => centerOn(ui.selected),
@@ -813,4 +818,4 @@ function mapPadding() {
   if (st.width - left - right < 240) { left = 50; right = 50; }
   return {paddingTopLeft: [left, 60], paddingBottomRight: [right, 40]};
 }
-window.fleetUI = {select, selected: () => ui.selected, swapMain, openPanel, flash, mapPadding};
+window.fleetUI = {select, selected: () => ui.selected, swapMain, openPanel, panel: () => openPanelName, flash, mapPadding};

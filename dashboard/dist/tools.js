@@ -182,7 +182,7 @@
   });
   map.on('mousemove', e => { if (measuring && a && !b) drawMeasure(e.latlng); });
   // Starting a preview point pick ends measuring, so one click never does both.
-  document.querySelector('#preview-pick')?.addEventListener('click', () => { if (measuring) stopMeasure(); });
+  document.querySelector('#wf-pick')?.addEventListener('click', () => { if (measuring) stopMeasure(); });
 
   window.fleetTools = {toggleMeasure, stopMeasure, measuring: () => measuring};
   setFormat(format);
