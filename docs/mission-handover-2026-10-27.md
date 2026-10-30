@@ -71,6 +71,11 @@ that exists the Cruza can send video or detections, not both.
   it is **decision only**: the point is marked ◎ on the map for the safety
   pilot and logged with `"mode": "decision-only"`. This is the mode for the
   28 Oct flight test, since quadpi's installed bridge takes arm/disarm only.
+- **Approve → Arm & fly mission** (added 29 Oct): the approval launches the quad on the
+  mission already on its flight controller, not to the cue's point. It opens that
+  aircraft's Arm & fly mission review with the mission read back, leaving one **Send**
+  click, and the review expires after 20 s. The cue's position is not used, so the
+  60 s freshness rule does not apply to this choice.
 - **Deny** takes an optional reason (False detection / Not a priority / Unsafe
   or airspace / Duplicate).
 - Every approval, denial and expiry is appended to `runtime/handover.log`

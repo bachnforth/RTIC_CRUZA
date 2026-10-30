@@ -15,8 +15,11 @@
   const names = {cruza: 'Cruza', quadpi: 'quadpi', rn03: 'TFW drone'};
   // Aircraft a cue can be handed to, and the commands an approval can name.
   const TARGETS = ['quadpi', 'rn03'];
-  const HANDOVER_ACTIONS = ['goto', 'loiter'];
-  const ACTION_LABELS = {goto: 'Fly to point & hold', loiter: 'Loiter (circle)'};
+  const HANDOVER_ACTIONS = ['goto', 'loiter', 'arm_mission'];
+  const ACTION_LABELS = {goto: 'Fly to point & hold', loiter: 'Loiter (circle)', arm_mission: 'Arm & fly mission'};
+  // arm_mission flies the mission already on the aircraft: the cue's point is
+  // not used, so a stale position does not block it.
+  const POINT_ACTIONS = ['goto', 'loiter'];
   const REASONS = ['False detection', 'Not a priority', 'Unsafe or airspace', 'Duplicate'];
   const cards = new Map();   // request id -> {li, parts}
   let controls = {}, busy = false;
@@ -50,6 +53,11 @@
 
   function prefill(r, actionId) {
     const d = r.decision;
+    if (!POINT_ACTIONS.includes(actionId)) {
+      const note = `Handover ${r.id} approved (${r.cls}, from ${label(r.src)}): ${label(d.target)}'s ` +
+        'own mission is selected. Check it, confirm props and area, then send — nothing has been sent yet.';
+      return window.commandWorkflow?.prefill(d.target, actionId, null, note);
+    }
     const note = `Handover ${r.id} approved (${r.cls}, from ${label(r.src)}): point prefilled. ` +
       'Set the altitude, review and send — nothing has been sent yet.';
     return window.commandWorkflow?.prefill(d.target, actionId,
@@ -191,9 +199,12 @@
     p.again.textContent = d && d.mode !== 'live' ? 'Show point on map' : 'Prefill workflow again';
     p.copy.hidden = !d;
     p.approved.hidden = !d;
-    if (d) p.approved.textContent = `Approved point ${coords(d)} · ${ACTION_LABELS[d.action] || d.action}` +
+    if (d) p.approved.textContent = (POINT_ACTIONS.includes(d.action)
+      ? `Approved point ${coords(d)} · ${ACTION_LABELS[d.action] || d.action}`
+      : `Approved: ${ACTION_LABELS[d.action] || d.action} on ${label(d.target)} · cue at ${coords(d)}`) +
       (d.mode === 'live' ? '' : ' · nothing sent');
-    const why = r.age_s > 60 ? 'Position is over 60 s old; wait for a fresh sighting or deny it.' : '';
+    const why = r.age_s > 60 && POINT_ACTIONS.includes(p.action.value)
+      ? 'Position is over 60 s old; wait for a fresh sighting or deny it.' : '';
     p.approve.disabled = busy || !!why;
     p.approve.title = why;
     // Say on the button itself why it does nothing, not only in the note below.

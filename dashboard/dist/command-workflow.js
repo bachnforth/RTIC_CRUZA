@@ -249,22 +249,29 @@
     render();
   });
   // Used by the mission handover panel after an approval: selects the aircraft
-  // and command and drops the approved point. The operator still sets the
-  // altitude, reviews and sends; nothing is transmitted from here.
+  // and command. With a point (fly to / loiter) it drops the approved point and
+  // the operator still sets the altitude, reviews and sends. Without one (Arm &
+  // fly mission) it opens the review of the aircraft's own mission, leaving
+  // only Send. Nothing is transmitted from here.
   window.commandWorkflow = {
     prefill(target, actionId, point, note) {
       if (!controls[target]) return false;
       platform.value = target;
       platform.onchange();
-      if ([...command.options].some(o => o.value === actionId)) command.value = actionId;
+      if (![...command.options].some(o => o.value === actionId)) return false;
+      command.value = actionId;
       command.onchange();
-      window.fleetMap.setCandidate(point.latitude, point.longitude);
+      if (point) window.fleetMap.setCandidate(point.latitude, point.longitude);
       const drawer = panel.closest('details');
       if (drawer) drawer.open = true;
+      if (!point) $('#wf-build').onclick();
+      const reviewing = !point && !$('#wf-review').hidden;
       result.className = '';
-      result.textContent = note;
+      // Keep the review's own expiry notice after the handover note.
+      result.textContent = note + (reviewing ? ` ${result.textContent}`
+        : point ? '' : ` Not ready to review yet: ${$('#wf-action-note').textContent}`);
       panel.scrollIntoView({block: 'nearest', behavior: 'smooth'});
-      altitude.focus({preventScroll: true});
+      (reviewing ? $('#wf-confirm') : point ? altitude : command).focus({preventScroll: true});
       return true;
     },
   };

@@ -546,14 +546,15 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(body, dict):
             self.send_error(400)
             return
+        action = body.get('action', 'goto')
         ok, message, request = handovers.decide(body.get('id'), body.get('decision'),
                                                 target=body.get('target'),
                                                 reason=body.get('reason', ''),
-                                                # Only links that take a point command;
-                                                # the bench link (arm/disarm) does not.
+                                                # Only links that offer the chosen command;
+                                                # the bench link (arm/disarm) offers none of them.
                                                 live=tuple(name for name, link in controls.items()
-                                                           if {'goto', 'loiter'} & {a['id'] for a in link.actions}),
-                                                action=body.get('action', 'goto'))
+                                                           if action in {a['id'] for a in link.actions}),
+                                                action=action)
         raw = json.dumps(dict(ok=ok, message=message, request=request), allow_nan=False).encode()
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')

@@ -176,6 +176,23 @@ class QueueTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn('old', msg)
 
+    def test_mission_launch_ignores_position_age(self):
+        # Arm & fly mission flies the aircraft's own mission, not the cue's point.
+        self.q.sync([cue()])
+        rid = self.q.snapshot()[0]['id']
+        self.clock.now += APPROVE_MAX_AGE_S + 1
+        ok, msg, r = self.q.decide(rid, 'approve', target='rn03', live=('rn03',), action='arm_mission')
+        self.assertTrue(ok, msg)
+        self.assertEqual((r['decision']['target'], r['decision']['action'], r['decision']['mode']),
+                         ('rn03', 'arm_mission', 'live'))
+        [entry] = self.entries()
+        self.assertEqual((entry['outcome'], entry['target']), ('approved', 'rn03'))
+
+    def test_unknown_command_is_refused(self):
+        self.q.sync([cue()])
+        rid = self.q.snapshot()[0]['id']
+        self.assertFalse(self.q.decide(rid, 'approve', target='quadpi', live=('quadpi',), action='disarm')[0])
+
     def test_deny_with_reason_suppresses_reoffer_then_drops(self):
         self.q.sync([cue()])
         rid = self.q.snapshot()[0]['id']

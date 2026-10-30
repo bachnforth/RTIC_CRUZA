@@ -8,9 +8,10 @@ not raise a new request each time. A decided request also absorbs later
 sightings for a while, so a denied target is not offered again straight away.
 
 Approval transmits nothing. It freezes the position that was approved and the
-aircraft chosen to take it. If that aircraft has a live link that accepts a
-point command, the browser prefills its command workflow, where the command is
-still reviewed and sent as usual. Otherwise the approval is *decision only*:
+aircraft chosen to take it. If that aircraft has a live link, the browser
+prefills its command workflow (fly to the point, loiter at it, or arm and fly
+the mission already on the aircraft), where the command is still reviewed and
+sent as usual. Otherwise the approval is *decision only*:
 recorded and shown on the map for the safety pilot, with no command path at all. The
 decision is the record: every one is appended to a JSON-lines log with the
 image that was looked at.
@@ -35,7 +36,11 @@ FRESH_CUE_S = 2.0
 KEEP_DECIDED_S = 300    # decided requests absorb sightings, then drop off
 MERGE_RADIUS_M = swarm.FUSE_RADIUS_M
 MAX_REQUESTS = 40
-HANDOVER_ACTIONS = ('goto', 'loiter')  # workflow commands an approval can prefill
+HANDOVER_ACTIONS = ('goto', 'loiter', 'arm_mission')  # workflow commands an approval can prefill
+# Commands that fly to the approved point. arm_mission launches the mission
+# already on the aircraft, so the cue's position is not used and its age does
+# not block the approval.
+POINT_ACTIONS = ('goto', 'loiter')
 HANDOVER_TARGETS = ('quadpi', 'rn03')   # aircraft a cue can be handed to
 DENY_REASONS = ('False detection', 'Not a priority', 'Unsafe or airspace', 'Duplicate', '')
 
@@ -156,7 +161,7 @@ class HandoverQueue:
                 return False, 'That aircraft cannot take a handover.', self._public(r, now)
             mode = 'live' if target in live else 'decision-only'
             age = now - r['last_seen']
-            if age > APPROVE_MAX_AGE_S:
+            if action in POINT_ACTIONS and age > APPROVE_MAX_AGE_S:
                 return False, (f'Position is {age:.0f} s old; wait for a fresh sighting '
                                'or deny it.'), self._public(r, now)
             r.update(status='approved', decided=now,
