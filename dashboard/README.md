@@ -1,5 +1,68 @@
 # Cruza / RTIC fleet dashboard
 
+## Map-first layout (29 October 2026)
+
+The page no longer scrolls. The map fills the window and everything else sits
+on top of it, in the style of QGroundControl and ATAK/WinTAK:
+
+- **Aircraft tiles across the top** — one per aircraft, always visible: link
+  state (LIVE / ARMED / LINK LOST), mode, the most important alert, battery
+  gauge, altitude, speed (airspeed for Cruza) and GPS. A tile turns amber or
+  pulses red with its alerts. Click a tile for full details; its small buttons
+  center the map on that aircraft or swap its video into the main view.
+- **Tool rail on the left** opens one drawer at a time: Aircraft (attitude
+  display, readings, graphs, mission), Messages (all aircraft, filterable,
+  with an unread count), Layers, Measure, the PREVIEW ONLY command workflow,
+  and Help.
+- **Video windows float bottom-right** with mode, altitude, speed, heading and
+  battery printed over the picture. Each can be minimized, made fullscreen, or
+  swapped with the map (QGC-style: the video fills the screen and the map
+  becomes the small window). Small / Medium / Large sizes are under Layers.
+- **Bottom bar**: pointer coordinates (click to switch decimal, D°M′S″ or
+  MGRS), range and bearing from the selected aircraft to the pointer, map
+  status and connection.
+- **Measure** draws a range-and-bearing line between two clicked points.
+- **Keyboard**: 1/2/3 select aircraft, D details, M messages, L layers,
+  R measure, C preview, F fit, G center selected, S swap video/map,
+  V minimize videos, P pause video, A sound, Esc close. Listed under Help.
+- The map now zooms with the scroll wheel (the page itself cannot scroll).
+- Fit/Follow keep aircraft clear of the rail, open drawer and video windows.
+- A lost link opens that aircraft's details automatically only when it was
+  last seen armed (critical), so a powered-down aircraft doesn't take over.
+- Layout choices (selected aircraft, video size, coordinate format) are
+  remembered by this browser only.
+
+This is a page-layout change only. Telemetry, video transport, alerts, sound,
+the preview workflow and every safety note are unchanged; there are still no
+flight controls. The server only gained one new file to serve (`tools.js`).
+
+Verification: 14 new map-tool checks (`node dashboard/test_tools.cjs`; MGRS
+also matched an independent library on 408 random points), the existing map
+checks and 29 Python checks pass. A local, explicitly SIMULATED telemetry
+harness (not in the repository) was used for desktop (1600×900, 1366×768) and
+phone-width screenshots, keyboard shortcuts, video swap/minimize/pause and the
+preview workflow, with no page errors. Not yet checked against live aircraft
+or the real MediaMTX video.
+
+### With live control and mission handover (30 October 2026)
+
+The map-first layout was merged with the live command workflow and mission
+handover from `feature/tfw-drone-control`. In this layout:
+
+- The rail's **Command** button (C) opens the command workflow drawer. It is
+  the live workflow, not the preview, when a control link is started.
+- **Handover** (O) opens the mission handover drawer, which is wider to show
+  the pictures. While a request waits for a decision, the rail button turns
+  amber and shows the count. Each new request opens the drawer and flashes a
+  note on the map. It does not do this while you are typing in the command
+  workflow or have a review open waiting for Send.
+- Approving a card opens the Command drawer at that aircraft's review, as
+  before.
+- **Areas** (I) opens the areas-of-interest list.
+- The bottom bar says **READ-ONLY · NO FLIGHT CONTROLS**, or **LIVE CONTROL**
+  in amber with the aircraft named.
+- The TFW drone has a video window, as quadpi does.
+
 ## Mission handover (27–28 October 2026) — tested with the real Cruza on the ground, not yet in flight
 
 The **Mission handover** panel is hidden until a request exists; while one awaits a decision it moves above the map. It lists each geolocated

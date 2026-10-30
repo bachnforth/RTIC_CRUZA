@@ -1,7 +1,9 @@
 'use strict';
 (function(){
 const titles={cruza:'Cruza',quadpi:'quadpi',rn03:'TFW drone'},colors={cruza:'#7ce1ba',quadpi:'#7dbcf4',rn03:'#d3a9ed'};
-const map=L.map('map',{minZoom:1,maxZoom:19,worldCopyJump:true,scrollWheelZoom:false}).setView([39,-98],3);
+const map=L.map('map',{minZoom:1,maxZoom:19,worldCopyJump:true,scrollWheelZoom:true}).setView([39,-98],3);
+// Map-first layout: zoom at top right, scale and credits bottom left (videos sit bottom right).
+map.zoomControl.setPosition('topright');map.attributionControl.setPosition('bottomleft');
 map.createPane('basemap').style.zIndex=240;
 map.createPane('stateBorders').style.zIndex=300;
 map.createPane('stateLabels').style.zIndex=350;
@@ -49,14 +51,14 @@ fetch('/imagery/manifest.json').then(r=>{if(!r.ok)throw Error();return r.json();
  toggle.closest('label').hidden=false;toggle.onchange=()=>{if(toggle.checked)group.addTo(map);else map.removeLayer(group);};
  if(overviewMode==='us')usOverview('field');
 }).catch(()=>{});
-function fit(){const points=latest.map(v=>FleetMapState.positionState(v)).filter(s=>s.position).map(s=>[s.position.latitude,s.position.longitude]);if(!points.length)return;overviewMode=false;fitting=true;try{map.fitBounds(L.latLngBounds(points),{padding:[60,50],maxZoom:16,animate:false});}finally{fitting=false;}}
+function fit(){const points=latest.map(v=>FleetMapState.positionState(v)).filter(s=>s.position).map(s=>[s.position.latitude,s.position.longitude]);if(!points.length)return;overviewMode=false;fitting=true;try{map.fitBounds(L.latLngBounds(points),{...(window.fleetUI?.mapPadding?.()||{padding:[60,50]}),maxZoom:16,animate:false});}finally{fitting=false;}}
 function focus(v){const s=FleetMapState.positionState(v);if(!s.position)return;overviewMode=false;follow.checked=false;map.setView([s.position.latitude,s.position.longitude],Math.max(map.getZoom(),16),{animate:false});layers[v.name]?.marker?.openPopup();}
 function popup(v,s){const box=document.createElement('div'),title=document.createElement('strong');title.textContent=titles[v.name];box.append(title,document.createElement('br'));box.append(document.createTextNode(s.label),document.createElement('br'));box.append(document.createTextNode(s.position.latitude.toFixed(6)+', '+s.position.longitude.toFixed(6)));if(s.kind==='live'&&Number.isFinite(s.position.altitude_relative_m)){box.append(document.createElement('br'),document.createTextNode('Relative altitude '+s.position.altitude_relative_m.toFixed(1)+' m'));}if(s.kind==='live'&&Number.isFinite(v.airspeed_m_s)){box.append(document.createElement('br'),document.createTextNode('Airspeed '+v.airspeed_m_s.toFixed(1)+' m/s'));}if(s.kind==='live'&&v.home){box.append(document.createElement('br'),document.createTextNode(Math.round(v.home.distance_m)+' m from '+v.home.reference));}return box;}
 function update(fleet){latest=fleet;const legend=document.querySelector('#map-legend');legend.replaceChildren();let live=0,last=0;
  for(const id of Object.keys(titles)){
   const v=fleet.find(v=>v.name===id)||{name:id,configured:id!=='rn03',online:false};const s=FleetMapState.positionState(v);const group=layers[id]||(layers[id]={});const color=colors[id];
   if(s.position){const loc=[s.position.latitude,s.position.longitude];const active=s.kind==='live';live+=active?1:0;last+=active?0:1;
-   if(!group.marker){group.marker=L.circleMarker(loc,{radius:9,weight:3}).addTo(map);group.marker.bindTooltip('',{permanent:true,direction:'top',offset:[0,-10],className:'aircraft-label'});}
+   if(!group.marker){group.marker=L.circleMarker(loc,{radius:9,weight:3}).addTo(map);group.marker.on('click',()=>window.fleetUI?.select(id));group.marker.bindTooltip('',{permanent:true,direction:'top',offset:[0,-10],className:'aircraft-label'});}
    group.marker.setLatLng(loc).setStyle({color:active?color:'#93a6b2',fillColor:active?color:'#243b49',fillOpacity:active?.9:.5,dashArray:active?null:'4 4'});
    group.marker.setTooltipContent(titles[id]+(active?'':' · last known'));group.marker.bindPopup(popup(v,s));group.marker.bringToFront();const hdg=active&&Number.isFinite(v.heading_deg)?v.heading_deg:null;if(hdg!==null){const html=`<svg viewBox="-20 -20 40 40" width="40" height="40" style="transform:rotate(${hdg}deg)"><path d="M0 -19 L6 -9 L-6 -9 Z" fill="${color}" stroke="#0a1017" stroke-width="1.5"/></svg>`;if(!group.arrow)group.arrow=L.marker(loc,{interactive:false,keyboard:false,icon:L.divIcon({className:'heading-arrow',html,iconSize:[40,40],iconAnchor:[20,20]})}).addTo(map);else{group.arrow.setLatLng(loc);group.arrow.getElement()&&(group.arrow.getElement().innerHTML=html);}}else if(group.arrow){map.removeLayer(group.arrow);group.arrow=null;}
   }else if(group.marker){map.removeLayer(group.marker);group.marker=null;if(group.arrow){map.removeLayer(group.arrow);group.arrow=null;}}
@@ -69,7 +71,7 @@ function update(fleet){latest=fleet;const legend=document.querySelector('#map-le
 }
  document.querySelector('#fit-fleet').onclick=()=>{follow.checked=true;fit();};follow.onchange=()=>{if(follow.checked)fit();};
  document.querySelector('#map-fullscreen').onclick=()=>{const box=document.querySelector('main');(document.fullscreenElement?document.exitFullscreen():box.requestFullscreen()).catch(()=>{});};
- document.addEventListener('fullscreenchange',()=>{document.querySelector('#map-fullscreen').textContent=document.fullscreenElement?'Exit dashboard fullscreen':'Expand dashboard';map.invalidateSize({pan:false});});
+ document.addEventListener('fullscreenchange',()=>{document.querySelector('#map-fullscreen span').textContent=document.fullscreenElement?'Exit fullscreen':'Expand dashboard';map.invalidateSize({pan:false});});
  document.querySelector('#street-map').onclick=()=>{
   const b=document.querySelector('#street-map'),note=document.querySelector('#map-layer-note');
   if(streets){map.removeLayer(streets);streets=null;if(countries)countries.addTo(map).bringToBack();b.textContent='Enable street map';b.setAttribute('aria-pressed','false');note.textContent='Street maps share the viewed area and your IP with OpenStreetMap.';return;}
@@ -111,7 +113,9 @@ function setAOIs(list){
 // Set a candidate programmatically (e.g. from a validated area of interest).
 function setCandidate(lat,lon){cancelPick();placeCandidate(lat,lon);}
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&picking){cancelPick();document.dispatchEvent(new Event('fleet-pick-cancelled'));}});
-function highlightPlatform(){for(const [id,group] of Object.entries(layers)){if(group.marker)group.marker.setRadius(id===selectedPlatform?13:9);}}
+let selectedAircraft='';
+function highlightPlatform(){for(const [id,group] of Object.entries(layers)){if(group.marker){group.marker.setRadius(id===selectedPlatform?13:id===selectedAircraft?11:9);group.marker.setStyle({weight:id===selectedAircraft?4:3});}}}
+function focusAircraft(id){const v=latest.find(v=>v.name===id);if(!v||!FleetMapState.positionState(v).position)return false;focus(v);return true;}
 document.addEventListener('fleet-preview-platform',event=>{selectedPlatform=event.detail;highlightPlatform();});
 // Loaded mission route, shown while "Arm & fly mission" is selected (read from the aircraft).
 let route=null,routeKey='';
@@ -122,5 +126,5 @@ function clearRoute(){if(route){map.removeLayer(route);route=null;}routeKey='';}
 const handoverLayer=L.layerGroup().addTo(map);let handoverKey='';
 function showHandovers(list){const key=JSON.stringify(list);if(key===handoverKey)return;handoverKey=key;handoverLayer.clearLayers();for(const h of list){if(!Number.isFinite(h.lat)||!Number.isFinite(h.lon))continue;L.marker([h.lat,h.lon],{keyboard:false,interactive:false,icon:L.divIcon({className:'handover-pin',html:'<span>◎</span>',iconSize:[30,30],iconAnchor:[15,15]})}).bindTooltip(h.label,{permanent:true,direction:'bottom'}).addTo(handoverLayer);}}
 function focusPoint(lat,lon){if(!Number.isFinite(lat)||!Number.isFinite(lon))return;follow.checked=false;overviewMode=false;map.setView([lat,lon],Math.max(map.getZoom(),16),{animate:false});}
-window.fleetMap={update:fleet=>{update(fleet);highlightPlatform();},startPick,clearCandidate,cancelPick,showRoute,clearRoute,setCandidate,setAOIs,showHandovers,focusPoint};
+window.fleetMap={update:fleet=>{update(fleet);highlightPlatform();},startPick,clearCandidate,cancelPick,showRoute,clearRoute,setCandidate,setAOIs,showHandovers,focusPoint,map,focusAircraft,select:id=>{selectedAircraft=id;highlightPlatform();},latest:()=>latest};
 })();

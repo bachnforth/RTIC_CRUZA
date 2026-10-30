@@ -236,15 +236,12 @@
       invalidate();
       fillPlatforms();
       fillCommands();
-      const drawer = panel.closest('details');
-      if (key && drawer) drawer.open = true;
-      document.querySelector('#wf-badge-text').textContent = key ? 'LIVE' : 'PREVIEW ONLY';
-      const notice = document.querySelector('.notice');
-      notice.textContent = key ? `Live control ON for ${Object.keys(controls).map(id => names[id]).join(', ')} · each safety pilot's RC is the override · other aircraft are read-only` : 'Read-only · Pilot QGroundControl connections remain independent';
-      notice.classList.toggle('notice-control', !!key);
-      document.querySelector('footer p:last-child').textContent = key
-        ? 'Pause stops extra video; telemetry continues. Live control is ON for the platforms marked LIVE; the rest have no flight controls.'
-        : 'Pause stops extra video; telemetry continues. Closing this page stops both optional laptop copies. Video delays differ between aircraft. No flight controls.';
+      // The status bar says whether this page can command anything.
+      const notice = document.querySelector('#control-state');
+      notice.textContent = key ? `LIVE CONTROL · ${Object.keys(controls).map(id => names[id]).join(', ')} · RC IS THE OVERRIDE` : 'READ-ONLY · NO FLIGHT CONTROLS';
+      notice.title = key ? "Commands can be sent to the aircraft named here. Each safety pilot's RC is the override; the other aircraft are read-only."
+        : 'This dashboard sends nothing to any aircraft';
+      notice.classList.toggle('ro-live', !!key);
     }
     render();
   });
@@ -262,8 +259,7 @@
       command.value = actionId;
       command.onchange();
       if (point) window.fleetMap.setCandidate(point.latitude, point.longitude);
-      const drawer = panel.closest('details');
-      if (drawer) drawer.open = true;
+      window.fleetUI?.openPanel('preview', true);
       if (!point) $('#wf-build').onclick();
       const reviewing = !point && !$('#wf-review').hidden;
       result.className = '';

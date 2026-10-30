@@ -10,7 +10,7 @@
 (function () {
   const list = document.querySelector('#handover-list');
   const status = document.querySelector('#handover-status');
-  const badge = document.querySelector('#handover-badge');
+  const badge = document.querySelector('#handover-count');   // count on the tool rail button
   if (!list) return;
   const names = {cruza: 'Cruza', quadpi: 'quadpi', rn03: 'TFW drone'};
   // Aircraft a cue can be handed to, and the commands an approval can name.
@@ -23,13 +23,11 @@
   const REASONS = ['False detection', 'Not a priority', 'Unsafe or airspace', 'Duplicate'];
   const cards = new Map();   // request id -> {li, parts}
   let controls = {}, busy = false;
-  // The drawer is hidden until there is a request. While one awaits a decision
-  // it moves above the map and takes over the top of the page; once none is
-  // pending it goes back to its place under the map.
-  const drawer = list.closest('details');
-  const home = {parent: drawer.parentNode, next: drawer.nextSibling};
-  const workspace = document.querySelector('.workspace');
-  const announced = new Set();   // pending ids already scrolled to
+  // The panel lives in the side drawer. While a request awaits a decision the
+  // Handover rail button shows the count and pulses, and each new request opens
+  // the panel (unless the operator is busy with a command).
+  const railButton = document.querySelector('.rail [data-panel="handover"]');
+  const announced = new Set();   // pending ids already brought into view
 
   const label = id => names[id] || id;
   // Live means the control link takes a point command (the bench link does not).
@@ -241,28 +239,25 @@
       list.replaceChildren(...order);
     }
     const pending = requests.filter(r => r.status === 'pending').length;
-    badge.textContent = pending ? `${pending} AWAITING DECISION` : 'NONE PENDING';
-    badge.classList.toggle('ho-badge-pending', pending > 0);
+    if (badge) { badge.textContent = pending || ''; badge.hidden = !pending; }
     status.textContent = !requests.length ? 'No handover requests. Geolocated observer cues appear here for approval.'
       : `${pending} pending · ${requests.length - pending} recently decided`;
     takeover(requests, pending);
   }
 
   function takeover(requests, pending) {
-    drawer.hidden = !requests.length;
-    const atTop = drawer.parentNode !== home.parent;
-    if (pending && !atTop && workspace) {
-      workspace.before(drawer);
-    } else if (!pending && atTop) {
-      home.parent.insertBefore(drawer, home.next);
-    }
-    drawer.classList.toggle('handover-takeover', pending > 0);
-    if (pending) drawer.open = true;
-    // Bring a new request into view, unless the operator is busy with a command.
+    railButton?.classList.toggle('ho-alert', pending > 0);
+    // Bring a new request into view, unless the operator is busy with a command:
+    // typing in the workflow, or a review open and waiting for Send.
     const fresh = requests.filter(r => r.status === 'pending' && !announced.has(r.id));
     fresh.forEach(r => announced.add(r.id));
-    if (fresh.length && !document.activeElement?.closest('#command-workflow')) {
-      drawer.scrollIntoView({behavior: 'smooth', block: 'start'});
+    const busyWithCommand = document.activeElement?.closest('#command-workflow') ||
+      (window.fleetUI?.panel?.() === 'preview' && !document.querySelector('#wf-review')?.hidden);
+    if (!fresh.length) return;
+    window.fleetUI?.flash?.(`Handover request: ${fresh.map(r => `${r.id} ${r.cls}`).join(', ')}`);
+    if (!busyWithCommand) {
+      window.fleetUI?.openPanel('handover', true);
+      cards.get(fresh[0].id)?.li.scrollIntoView({behavior: 'smooth', block: 'nearest'});
     }
   }
 
