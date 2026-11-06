@@ -51,6 +51,7 @@ CIRCLE_START_AT_CENTRE = 4      # CIRCLE_OPTIONS bit: circle around where it ent
 THROTTLE_CENTRE = (1400, 1600)  # PWM band treated as "Pocket throttle centred"
 ARRIVE_M = 3.0                  # switch to CIRCLE this close to the chosen point
 CIRCLE_WAIT_S = 300             # give up flying to the circle point after this
+ARRIVE_WAIT_S = CIRCLE_WAIT_S   # ... or to the landing point
 # Menu shown by the command workflow, in order. immediate = sent on one click
 # from the always-visible row; the rest go through review and confirm.
 ACTION_INFO = [
@@ -65,6 +66,10 @@ ACTION_INFO = [
          text='Switches to GUIDED, arms and climbs straight up to the altitude. Props will spin.'),
     dict(id='goto', label='Fly to point & hold', point=True, altitude=True,
          text='Flies to the map point at the altitude (within 1 km) and holds there in GUIDED.'),
+    dict(id='goto_land', label='Fly to point & land', point=True, altitude=True,
+         text='Flies to the map point at the altitude (within 1 km) in GUIDED, then switches to LAND '
+              'once within 3 m of it and lands and disarms there. Any other command, or a Pocket mode '
+              'change on the way, cancels the landing.'),
     dict(id='loiter', label='Loiter (circle)', point='optional', altitude='with-point',
          text='Circles using the aircraft’s own CIRCLE radius and direction: around the map point '
               'if you pick one (flies there first at the altitude), otherwise around where it is now. '
@@ -139,6 +144,7 @@ class QuadControl:
         self.params = {}                          # circle-related FC parameters
         self.rc = None                            # (RC_CHANNELS, time)
         self.pending_circle = None                # point to circle on arrival
+        self.pending_land = None                  # point to land at on arrival
         self.mission = None                       # summary of the loaded mission
         self.mission_error = ''
         self.mission_dirty = False                # FC announced a new flight plan
@@ -227,36 +233,47 @@ class QuadControl:
                                  altitude_m=pending['alt']) if pending else None)
 
     def watch_circle(self):
-        """Switch to CIRCLE once the quad reaches a chosen loiter point."""
+        """Switch mode once the quad reaches a chosen point: CIRCLE for a
+        Loiter point, LAND for Fly to point & land."""
         while not self.stop.wait(.5):
-            p = self.pending_circle
-            if not p:
-                continue
-            v = self.vehicle()
-            if time.monotonic() > p['deadline'] or not v['armed'] or v['mode_id'] != GUIDED:
-                # Timed out, landed, or someone (Pocket, QGC, RTL) changed mode.
-                self.pending_circle = None
-                self.record(dict(action='loiter'), False, 'Circle cancelled before arrival')
-                continue
-            pos = v['position']
-            if not pos or distance_m(pos['latitude'], pos['longitude'], p['lat'], p['lon']) > ARRIVE_M \
-                    or abs(pos['altitude_relative_m']-p['alt']) > 2:
-                continue
-            if not self.lock.acquire(blocking=False):
-                continue                          # a user command is running; try again
+            self.check_arrival('pending_circle', 'loiter', CIRCLE, 'Arrived; circling',
+                               'Circle cancelled before arrival', check_alt=True)
+            # Landing needs only the horizontal position: LAND descends from
+            # whatever height it is at.
+            self.check_arrival('pending_land', 'goto_land', LAND, 'Arrived; landing',
+                               'Landing cancelled before arrival', check_alt=False)
+
+    def check_arrival(self, attr, action, mode, done_text, cancel_text, check_alt):
+        p = getattr(self, attr)
+        if not p:
+            return
+        v = self.vehicle()
+        if time.monotonic() > p['deadline'] or not v['armed'] or v['mode_id'] != GUIDED:
+            # Timed out, landed, or someone (Pocket, QGC, RTL) changed mode.
+            setattr(self, attr, None)
+            why = (f'; not there after {ARRIVE_WAIT_S} s, still in GUIDED'
+                   if time.monotonic() > p['deadline'] and v['armed'] and v['mode_id'] == GUIDED else '')
+            self.record(dict(action=action), False, cancel_text+why)
+            return
+        pos = v['position']
+        if not pos or distance_m(pos['latitude'], pos['longitude'], p['lat'], p['lon']) > ARRIVE_M \
+                or (check_alt and abs(pos['altitude_relative_m']-p['alt']) > 2):
+            return
+        if not self.lock.acquire(blocking=False):
+            return                                # a user command is running; try again
+        try:
+            if getattr(self, attr) is not p:
+                return
+            setattr(self, attr, None)
+            self.busy = action
             try:
-                if self.pending_circle is not p:
-                    continue
-                self.pending_circle = None
-                self.busy = 'loiter'
-                try:
-                    self.set_mode(CIRCLE)
-                    self.record(dict(action='loiter'), True, 'Arrived; circling')
-                except (CommandError, OSError) as exc:
-                    self.record(dict(action='loiter'), False, f'Arrived but {exc}')
-            finally:
-                self.busy = ''
-                self.lock.release()
+                self.set_mode(mode)
+                self.record(dict(action=action), True, done_text)
+            except (CommandError, OSError) as exc:
+                self.record(dict(action=action), False, f'Arrived but {exc}')
+        finally:
+            self.busy = ''
+            self.lock.release()
 
     # ---- loaded waypoint mission (read only) -----------------------------
     def wait_mission_reply(self, key, timeout):
@@ -442,6 +459,8 @@ class QuadControl:
         return dict(enabled=True, target=self.label, link=self.vehicle(),
                     actions=self.actions, circle=self.circle_info(), gcs_id=self.gcs[0],
                     mission=self.mission_status(),
+                    pending_land=dict(latitude=self.pending_land['lat'], longitude=self.pending_land['lon'],
+                                      altitude_m=self.pending_land['alt']) if self.pending_land else None,
                     busy=self.busy, history=self.history[-6:], error=self.error,
                     max_altitude_m=MAX_ALTITUDE_M, max_distance_m=MAX_GOTO_DISTANCE_M)
 
@@ -500,6 +519,9 @@ class QuadControl:
             if self.pending_circle:
                 self.pending_circle = None
                 entry['cancelled_pending_circle'] = True
+            if self.pending_land:
+                self.pending_land = None
+                entry['cancelled_pending_land'] = True
             try:
                 steps = self.plan(action, body, entry)
                 for step in steps:
@@ -575,6 +597,15 @@ class QuadControl:
         if action == 'goto':
             lat, lon, alt, message = self.reposition(body, v, entry)
             return [lambda: self.command('Fly to point', mav.MAV_CMD_DO_REPOSITION, message)]
+        if action == 'goto_land':
+            lat, lon, alt, message = self.reposition(body, v, entry)
+
+            def land_watch():
+                self.pending_land = dict(lat=lat, lon=lon, alt=alt,
+                                         deadline=time.monotonic()+ARRIVE_WAIT_S)
+                entry['ok_text'] = 'Flying to the point; will land on arrival'
+            return [lambda: self.command('Fly to landing point', mav.MAV_CMD_DO_REPOSITION, message),
+                    land_watch]
         if action == 'loiter':
             if not v['armed'] or v['in_air'] is False:
                 raise CommandError('Take off first; Loiter needs the quad in the air')

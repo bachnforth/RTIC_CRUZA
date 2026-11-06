@@ -145,9 +145,14 @@ stays read-only.
 quadpi's live commands in the workflow:
 **Arm & take off** to 1–120 m (switches to GUIDED, arms, takes off),
 **Fly to point & hold** picked on the map at 1–120 m (within 1 km of the quad),
+**Fly to point & land** (the same flight, then LAND once within 3 m of the point,
+horizontally; any other command or a Pocket mode change on the way cancels the
+landing, and after 300 s it gives up and keeps holding in GUIDED),
 **Loiter (circle)**, **Hold** (BRAKE, ignores the Pocket's sticks), **RTL**,
 **Land here**, **Arm motors (current mode)** and **Disarm** on the ground.
-Each step waits for the
+A point can be picked on the map or typed as an MGRS grid under
+*3 · Location* (spaces and case optional, 2–10 digits; the point is the centre
+of the grid square, so use 10 digits for 1 m). Each step waits for the
 aircraft's acknowledgement, is never retried, and shows the refusal reason
 (including recent PreArm text). Every action is appended to the ignored
 `runtime/quad-commands.log`. Cruza stays read-only.

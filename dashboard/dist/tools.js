@@ -76,6 +76,60 @@
     return `${String(zone).padStart(2, "0")}${band} ${col}${row} ${e} ${n}`;
   }
 
+  // UTM → WGS84 latitude/longitude (Snyder's series; sub-metre within a zone).
+  function fromUtm(zone, easting, northing, southern) {
+    const a = 6378137, f = 1 / 298.257223563, k0 = 0.9996;
+    const e2 = f * (2 - f), ep2 = e2 / (1 - e2), e4 = e2 * e2, e6 = e4 * e2;
+    const x = easting - 500000, y = southern ? northing - 10000000 : northing;
+    const mu = y / k0 / (a * (1 - e2 / 4 - 3 * e4 / 64 - 5 * e6 / 256));
+    const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+    const phi1 = mu + (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu)
+      + (21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu)
+      + (151 * e1 ** 3 / 96) * Math.sin(6 * mu) + (1097 * e1 ** 4 / 512) * Math.sin(8 * mu);
+    const sin = Math.sin(phi1), cos = Math.cos(phi1), tan = Math.tan(phi1);
+    const N1 = a / Math.sqrt(1 - e2 * sin * sin), T1 = tan * tan, C1 = ep2 * cos * cos;
+    const R1 = a * (1 - e2) / (1 - e2 * sin * sin) ** 1.5, D = x / (N1 * k0);
+    const lat = phi1 - (N1 * tan / R1) * (D * D / 2 - (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * ep2) * D ** 4 / 24
+      + (61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * ep2 - 3 * C1 * C1) * D ** 6 / 720);
+    const lon = rad((zone - 1) * 6 - 180 + 3) + (D - (1 + 2 * T1 + C1) * D ** 3 / 6
+      + (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * ep2 + 24 * T1 * T1) * D ** 5 / 120) / cos;
+    return {lat: deg(lat), lon: deg(lon)};
+  }
+
+  // MGRS text → the centre of the grid square it names, e.g. "16S FC 12345 67890",
+  // "16SFC1234567890" or "16S FC 123 678" (100 m). Spaces are optional; 2–10
+  // digits. Returns {lat, lon, precision_m, mgrs} or {error}.
+  const BANDS = 'CDEFGHJKLMNPQRSTUVWX';
+  function fromMgrs(text) {
+    const s = String(text || '').toUpperCase().replace(/\s+/g, '');
+    const m = /^(\d{1,2})([C-HJ-NP-X])([A-HJ-NP-Z])([A-HJ-NP-V])(\d*)$/.exec(s);
+    if (!m) return {error: 'Not an MGRS grid. Expected zone, band, square and digits, e.g. 16S FC 12345 67890.'};
+    const zone = Number(m[1]), band = m[2], digits = m[5];
+    if (zone < 1 || zone > 60) return {error: `Zone ${zone} does not exist (1–60).`};
+    if (digits.length % 2 || digits.length > 10) return {error: 'Easting and northing need the same number of digits (2, 4, 6, 8 or 10 in all).'};
+    const half = digits.length / 2, cell = 10 ** (5 - half);
+    const e = half ? Number(digits.slice(0, half)) * cell : 0, n = half ? Number(digits.slice(half)) * cell : 0;
+    const col = ['ABCDEFGH', 'JKLMNPQR', 'STUVWXYZ'][(zone - 1) % 3].indexOf(m[3]);
+    if (col < 0) return {error: `Square letter ${m[3]} is not used in zone ${zone}.`};
+    const rowIdx = ('ABCDEFGHJKLMNPQRSTUV'.indexOf(m[4]) - (zone % 2 === 0 ? 5 : 0) + 20) % 20;
+    const easting = (col + 1) * 100000 + e + cell / 2;
+    // The row letters repeat every 2000 km; the band says which repeat.
+    const bandIdx = BANDS.indexOf(band), southern = bandIdx < 10;
+    const bandSouth = -80 + bandIdx * 8, bandNorth = band === 'X' ? 84 : bandSouth + 8;
+    // Northing of the band's southern edge on the zone's central meridian;
+    // the 100 km margin covers points off the meridian.
+    const minNorthing = toUtm(bandSouth, (zone - 1) * 6 - 180 + 3).northing - 100000;
+    let northing = rowIdx * 100000 + n + cell / 2;
+    while (northing < minNorthing) northing += 2000000;
+    const p = fromUtm(zone, easting, northing, southern);
+    // Reject squares that do not fall in the band given (typing slips). A
+    // square can straddle a band edge, so allow a little either side.
+    if (!Number.isFinite(p.lat) || p.lat < bandSouth - 0.5 || p.lat > bandNorth + 0.5)
+      return {error: `Square ${m[3]}${m[4]} is not in band ${zone}${band}; check the letters.`};
+    const pretty = `${String(zone).padStart(2, '0')}${band} ${m[3]}${m[4]}` + (half ? ` ${digits.slice(0, half)} ${digits.slice(half)}` : '');
+    return {lat: p.lat, lon: p.lon, precision_m: cell, mgrs: pretty};
+  }
+
   function formatCoords(lat, lng, format) {
     lng = ((lng + 180) % 360 + 360) % 360 - 180;
     if (format === 'mgrs') return toMgrs(lat, lng) || 'Outside MGRS (polar)';
@@ -83,7 +137,7 @@
     return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   }
 
-  const api = {rangeBearing, formatDistance, formatBearing, toUtm, toMgrs, formatCoords};
+  const api = {rangeBearing, formatDistance, formatBearing, toUtm, fromUtm, toMgrs, fromMgrs, formatCoords};
   root.FleetTools = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;

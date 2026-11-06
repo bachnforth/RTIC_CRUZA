@@ -22,4 +22,22 @@ assert.ok(Math.abs(rb.bearing - 90) < 0.01);
 assert.equal(T.formatDistance(850), '850 m');
 assert.equal(T.formatDistance(2345), '2.35 km');
 assert.equal(T.formatBearing(5.4), '005°');
-console.log('14 map tool checks passed (MGRS, coordinate formats, range & bearing)');
+// MGRS entry: typed grid → centre of its square.
+let g = T.fromMgrs('18S UJ 23478 06483');
+assert.ok(Math.abs(g.lat - 38.8895) < 1e-4 && Math.abs(g.lon + 77.0353) < 1e-4 && g.precision_m === 1);
+assert.deepEqual(T.fromMgrs('18suj2347806483'), g);                 // case and spaces optional
+assert.equal(T.fromMgrs('16S FC 123 678').precision_m, 100);
+assert.equal(T.fromMgrs('16S FC 123 678').mgrs, '16S FC 123 678');
+assert.equal(T.toMgrs(T.fromMgrs('56H LH 12345 67890').lat, T.fromMgrs('56H LH 12345 67890').lon), '56H LH 12345 67890'); // south
+assert.match(T.fromMgrs('16S FC 1234 567').error, /same number of digits/);
+assert.match(T.fromMgrs('16T FC 12345 67890').error, /not in band/);  // wrong band letter
+assert.match(T.fromMgrs('61S FC 1 1').error, /Zone/);
+assert.ok(T.fromMgrs('hello').error);
+// Every 1 m grid round-trips exactly, within 0.71 m (half the square's diagonal).
+for (let i = 0; i < 3000; i++) {
+  const lat = -79.9 + Math.random() * 163.8, lon = -180 + Math.random() * 360, grid = T.toMgrs(lat, lon);
+  const p = T.fromMgrs(grid);
+  assert.equal(T.toMgrs(p.lat, p.lon), grid, grid);
+  assert.ok(T.rangeBearing({lat, lng: lon}, {lat: p.lat, lng: p.lon}).distance < 0.71, grid);
+}
+console.log('24 map tool checks passed (MGRS both ways, coordinate formats, range & bearing)');

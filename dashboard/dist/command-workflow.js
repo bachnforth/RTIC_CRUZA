@@ -21,7 +21,9 @@
   ];
   const REVIEW_SECONDS = 20;
   let controls = {}, candidate = null, reviewed = null, reviewTimer = null, sending = false, liveKey = '';
-  const coordinates = p => `${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}`;
+  const mgrsOf = p => window.FleetTools?.toMgrs(p.latitude, p.longitude);
+  const coordinates = p => `${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}` + (mgrsOf(p) ? ` (MGRS ${mgrsOf(p)})` : '');
+  const gridNote = $('#wf-grid-note');
   const live = () => controls[platform.value];
   const actionsFor = id => controls[id] ? controls[id].actions : previewActions.filter(a => !a.skip?.includes(id));
   const action = () => actionsFor(platform.value).find(a => a.id === command.value);
@@ -33,7 +35,7 @@
     if (a.id === 'arm' && ![0, 2, 5, 16].includes(link.mode_id)) return `Mode is ${link.mode}: set the Pocket switch to STABILIZE first.`;
     if (a.id === 'arm_takeoff' && link.armed) return 'Already armed. Use Fly to point & hold, Hold, RTL or Land.';
     if (a.id === 'arm_takeoff' && !link.position) return 'No position fix yet; GUIDED takeoff needs GPS.';
-    if (a.id === 'goto' && (!link.armed || link.in_air === false)) return 'Take off first.';
+    if ((a.id === 'goto' || a.id === 'goto_land') && (!link.armed || link.in_air === false)) return 'Take off first (Arm & take off).';
     if (a.id === 'arm_mission') {
       const m = live()?.mission;
       if (link.armed) return 'Already armed: the mission launch starts from the ground.';
@@ -177,6 +179,25 @@
     result.textContent = 'Select a point on the map. Escape cancels point selection.';
   };
   document.addEventListener('fleet-candidate', event => { candidate = event.detail; invalidate(); result.textContent = ''; render(); });
+  // Typed MGRS grid → the same candidate point a map pick makes (centre of
+  // the grid square; a 10-digit grid is a 1 m square).
+  $('#wf-grid-form').onsubmit = event => {
+    event.preventDefault();
+    const p = window.FleetTools?.fromMgrs($('#wf-grid').value);
+    if (!p || p.error) {
+      gridNote.className = 'failed';
+      gridNote.textContent = p ? p.error : 'Map tools not loaded.';
+      return;
+    }
+    window.fleetMap.setCandidate(p.lat, p.lon);
+    window.fleetMap.focusPoint?.(p.lat, p.lon);
+    $('#wf-grid').value = p.mgrs;
+    gridNote.className = '';
+    gridNote.textContent = p.precision_m > 1
+      ? `Centre of the ${p.precision_m >= 1000 ? p.precision_m / 1000 + ' km' : p.precision_m + ' m'} square. Use 10 digits for 1 m.`
+      : 'Grid set (1 m square).';
+  };
+  $('#wf-grid').oninput = () => { gridNote.textContent = ''; gridNote.className = ''; };
   document.addEventListener('fleet-pick-cancelled', () => { result.textContent = 'Point selection cancelled.'; });
   $('#wf-clear').onclick = () => { candidate = null; window.fleetMap.clearCandidate(); invalidate(); render(); };
   $('#wf-build').onclick = () => {
@@ -198,6 +219,12 @@
       sentence += c.centred ? 'Centred on that position. '
         : `CIRCLE_OPTIONS does not start at centre: the circle's centre will be ${c.radius_m} m ahead of the aircraft. `;
       sentence += 'Keep the Pocket throttle centred. ';
+    } else if (a.id === 'goto_land' && isLive) {
+      const from = live().link?.position, rb = from && window.FleetTools?.rangeBearing(
+        {lat: from.latitude, lng: from.longitude}, {lat: candidate.latitude, lng: candidate.longitude});
+      sentence += `Fly to ${coordinates(candidate)} at ${altitudeValue(a)} m above home` +
+        (rb ? ` (${window.FleetTools.formatDistance(rb.distance)} at ${window.FleetTools.formatBearing(rb.bearing)} from the aircraft)` : '') +
+        ', then switch to LAND within 3 m of it, land and disarm. Make sure the landing spot is clear. ';
     } else {
       if (usesPoint(a)) sentence += `Destination ${coordinates(candidate)}. `;
       if (needsAltitude(a)) sentence += `Altitude ${altitudeValue(a)} m above home. `;

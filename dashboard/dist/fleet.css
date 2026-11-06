@@ -268,6 +268,9 @@ kbd{font:600 11px/1 "Cascadia Mono",Consolas,monospace;background:#1d2f3c;border
 .command-preview select:focus-visible,.command-preview input:focus-visible{outline:2px solid var(--accent)}
 .command-preview [hidden]{display:none}.command-preview select:disabled{opacity:.5;cursor:default}
 .preview-point{display:grid;gap:8px}.preview-point>strong{font-size:12px;color:#b1c3d0}
+.wf-grid{display:grid;gap:4px;margin:0}.wf-grid label{font-size:12px;color:#b1c3d0}
+.wf-grid-row{display:flex;gap:6px}.wf-grid-row input{flex:1;min-width:0;font-family:ui-monospace,Consolas,monospace;text-transform:uppercase}
+#wf-grid-note{margin:0;font-size:12px;min-height:0}#wf-grid-note.failed{color:#ff9a7a}
 .preview-review{border:1px solid #b99a55;background:#302713;border-radius:6px;padding:12px;display:grid;gap:12px}.preview-review p{color:#ffe3aa}
 #preview-result{color:#b5e7d5;min-height:20px}
 

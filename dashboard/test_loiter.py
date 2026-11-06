@@ -82,6 +82,56 @@ class LoiterTests(unittest.TestCase):
         self.assertEqual(self.modes_sent(bridge), [control.CIRCLE])
         self.assertIn('Arrived; circling', q.history[-1]['result'])
 
+    def test_goto_land_flies_there_then_lands(self):
+        bridge = FakeBridge()
+        q = self.link(bridge, **FLYING)
+        entry = q.execute(dict(action='goto_land', latitude=35.0500, longitude=-79.4900, altitude_m=15))
+        self.assertTrue(entry['ok'], entry)
+        self.assertIn('will land on arrival', entry['result'])
+        repo = [m for m in bridge.received if m.get_type() == 'COMMAND_INT']
+        self.assertEqual((repo[0].command, repo[0].x, repo[0].y, repo[0].z),
+                         (mav.MAV_CMD_DO_REPOSITION, 350500000, -794900000, 15))
+        self.assertEqual(q.status()['pending_land']['altitude_m'], 15)
+        for _ in range(5):                                       # still on the way
+            bridge.vehicle(**dict(FLYING, lat=35.0497, lon=-79.4900, alt=15))
+            time.sleep(.2)
+        self.assertEqual(self.modes_sent(bridge), [])
+        for _ in range(15):        # arrives horizontally; height need not match
+            bridge.vehicle(**dict(FLYING, lat=35.05001, lon=-79.49001, alt=11))
+            time.sleep(.2)
+            if self.modes_sent(bridge):
+                break
+        self.assertEqual(self.modes_sent(bridge), [control.LAND])
+        self.assertIn('Arrived; landing', q.history[-1]['result'])
+        self.assertIsNone(q.pending_land)
+
+    def test_goto_land_refused_on_ground_and_cancelled_by_other_commands(self):
+        ground = FakeBridge()
+        q0 = self.link(ground)
+        self.assertIn('Take off first', q0.execute(dict(action='goto_land', latitude=35.05,
+                                                         longitude=-79.49, altitude_m=15))['result'])
+        self.assertEqual(ground.received, [])
+        bridge = FakeBridge()
+        q = self.link(bridge, **FLYING)
+        q.execute(dict(action='goto_land', latitude=35.0500, longitude=-79.4900, altitude_m=15))
+        entry = q.execute(dict(action='hold'))
+        self.assertTrue(entry.get('cancelled_pending_land'))
+        for _ in range(5):
+            bridge.vehicle(**dict(FLYING, mode=17, lat=35.0500, lon=-79.4900, alt=15))
+            time.sleep(.2)
+        self.assertEqual(self.modes_sent(bridge), [control.BRAKE])
+
+    def test_pocket_mode_change_cancels_pending_land(self):
+        bridge = FakeBridge()
+        q = self.link(bridge, **FLYING)
+        q.execute(dict(action='goto_land', latitude=35.0500, longitude=-79.4900, altitude_m=15))
+        for _ in range(6):
+            bridge.vehicle(**dict(FLYING, mode=5, lat=35.0500, lon=-79.4900, alt=15))
+            time.sleep(.2)
+        self.assertIsNone(q.pending_land)
+        self.assertIn('Landing cancelled', q.history[-1]['result'])
+        self.assertEqual(self.modes_sent(bridge), [])
+
     def test_any_command_cancels_pending_circle(self):
         bridge = FakeBridge()
         q = self.link(bridge, **FLYING)
