@@ -42,7 +42,9 @@ CIRCLE = 7
 # The circle is the FC's own: radius, rate (sign = direction) and options are
 # read, never written. RCMAP_THROTTLE says which RC channel is throttle.
 CIRCLE_PARAMS = ('CIRCLE_RADIUS_M', 'CIRCLE_RADIUS', 'CIRCLE_RATE', 'CIRCLE_OPTIONS', 'RCMAP_THROTTLE',
-                 'MAV_GCS_SYSID', 'SYSID_MYGCS')
+                 'MAV_GCS_SYSID', 'SYSID_MYGCS', 'WP_SPD', 'WPNAV_SPEED')
+# Read-only too: the FC's waypoint speed (WP_SPD m/s from 4.7, WPNAV_SPEED cm/s
+# before), which Fly to point & land multiplies for its own leg.
 # The FC only counts heartbeats from its configured GCS system id
 # (MAV_GCS_SYSID, SYSID_MYGCS before 4.7) for GCS failsafe, so the UDP link
 # adopts that id once read and sends no commands until it knows it.
@@ -52,6 +54,12 @@ THROTTLE_CENTRE = (1400, 1600)  # PWM band treated as "Pocket throttle centred"
 ARRIVE_M = 3.0                  # switch to CIRCLE this close to the chosen point
 CIRCLE_WAIT_S = 300             # give up flying to the circle point after this
 ARRIVE_WAIT_S = CIRCLE_WAIT_S   # ... or to the landing point
+LAND_TAKEOFF_M = 50.0           # Fly to point & land from the ground climbs straight up to this
+CLIMB_WAIT_S = 90               # ... and must get there in this (WP_SPD_UP 2.5 m/s: ~20 s)
+CLIMB_MARGIN_M = 1.0            # ... to within this, before any horizontal travel
+LAND_SPEED_FACTOR = 1.5         # Fly to point & land travels at 1.5 x the FC's WP speed
+MAX_TRAVEL_SPEED_M_S = 8.0
+SETTLE_S = 3.0                  # heartbeats catch up with arm/mode acks in this
 # Menu shown by the command workflow, in order. immediate = sent on one click
 # from the always-visible row; the rest go through review and confirm.
 ACTION_INFO = [
@@ -67,9 +75,11 @@ ACTION_INFO = [
     dict(id='goto', label='Fly to point & hold', point=True, altitude=True,
          text='Flies to the map point at the altitude (within 1 km) and holds there in GUIDED.'),
     dict(id='goto_land', label='Fly to point & land', point=True, altitude=True,
-         text='Flies to the map point at the altitude (within 1 km) in GUIDED, then switches to LAND '
-              'once within 3 m of it and lands and disarms there. Any other command, or a Pocket mode '
-              'change on the way, cancels the landing.'),
+         text='From the ground: switches to GUIDED, arms and climbs straight up to 50 m before any '
+              'horizontal travel, then flies to the map point (within 1 km) at the altitude given. '
+              'Already flying: flies there at the altitude. Travels at 1.5× the aircraft’s waypoint '
+              'speed. Switches to LAND once within 3 m of the point and lands and disarms there. Any '
+              'other command, or a Pocket mode change on the way, cancels it. Props will spin.'),
     dict(id='loiter', label='Loiter (circle)', point='optional', altitude='with-point',
          text='Circles using the aircraft’s own CIRCLE radius and direction: around the map point '
               'if you pick one (flies there first at the altitude), otherwise around where it is now. '
@@ -248,14 +258,45 @@ class QuadControl:
         if not p:
             return
         v = self.vehicle()
-        if time.monotonic() > p['deadline'] or not v['armed'] or v['mode_id'] != GUIDED:
+        now = time.monotonic()
+        # Heartbeats lag the arm/mode acknowledgements by up to a second, so
+        # just after a ground launch the old disarmed state is not a cancel.
+        settling = now < p.get('settle_until', 0)
+        if now > p['deadline'] or (not settling and (not v['armed'] or v['mode_id'] != GUIDED)):
             # Timed out, landed, or someone (Pocket, QGC, RTL) changed mode.
             setattr(self, attr, None)
-            why = (f'; not there after {ARRIVE_WAIT_S} s, still in GUIDED'
-                   if time.monotonic() > p['deadline'] and v['armed'] and v['mode_id'] == GUIDED else '')
+            climbing = bool(p.get('reposition'))
+            why = ''
+            if now > p['deadline'] and v['armed'] and v['mode_id'] == GUIDED:
+                why = (f'; did not reach {p["climb_to"]:g} m within {CLIMB_WAIT_S} s, holding in GUIDED' if climbing
+                       else f'; not there after {ARRIVE_WAIT_S} s, still in GUIDED')
             self.record(dict(action=action), False, cancel_text+why)
             return
         pos = v['position']
+        if p.get('reposition'):
+            # Ground launch: climb straight up first, then set off for the point.
+            if settling or not pos or pos['altitude_relative_m'] < p['climb_to']-CLIMB_MARGIN_M:
+                return
+            if not self.lock.acquire(blocking=False):
+                return
+            try:
+                if getattr(self, attr) is not p:
+                    return
+                self.busy = action
+                try:
+                    self.command('Fly to landing point', mav.MAV_CMD_DO_REPOSITION, p['reposition'])
+                    p['reposition'] = None
+                    p['deadline'] = time.monotonic()+ARRIVE_WAIT_S
+                    self.record(dict(action=action), True,
+                                f'At {pos["altitude_relative_m"]:.0f} m; flying to the point'
+                                + self.travel_speed())
+                except (CommandError, OSError) as exc:
+                    setattr(self, attr, None)
+                    self.record(dict(action=action), False, f'Climbed but {exc}; holding in GUIDED')
+            finally:
+                self.busy = ''
+                self.lock.release()
+            return
         if not pos or distance_m(pos['latitude'], pos['longitude'], p['lat'], p['lon']) > ARRIVE_M \
                 or (check_alt and abs(pos['altitude_relative_m']-p['alt']) > 2):
             return
@@ -460,7 +501,12 @@ class QuadControl:
                     actions=self.actions, circle=self.circle_info(), gcs_id=self.gcs[0],
                     mission=self.mission_status(),
                     pending_land=dict(latitude=self.pending_land['lat'], longitude=self.pending_land['lon'],
-                                      altitude_m=self.pending_land['alt']) if self.pending_land else None,
+                                      altitude_m=self.pending_land['alt'],
+                                      climbing=bool(self.pending_land.get('reposition'))) if self.pending_land else None,
+                    land_takeoff_m=LAND_TAKEOFF_M,
+                    wp_speed_m_s=self.wp_speed(),
+                    land_speed_m_s=round(min(self.wp_speed()*LAND_SPEED_FACTOR, MAX_TRAVEL_SPEED_M_S), 1)
+                    if self.wp_speed() else None,
                     busy=self.busy, history=self.history[-6:], error=self.error,
                     max_altitude_m=MAX_ALTITUDE_M, max_distance_m=MAX_GOTO_DISTANCE_M)
 
@@ -598,12 +644,35 @@ class QuadControl:
             lat, lon, alt, message = self.reposition(body, v, entry)
             return [lambda: self.command('Fly to point', mav.MAV_CMD_DO_REPOSITION, message)]
         if action == 'goto_land':
+            if not v['armed']:
+                # From the ground: GUIDED, arm, climb straight up to
+                # LAND_TAKEOFF_M; the watcher sends the reposition (no
+                # horizontal travel before then) once it is there.
+                lat, lon, alt, message = self.reposition(body, v, entry, ground=True)
+                if not v['position']:
+                    raise CommandError('No position fix; GUIDED takeoff needs GPS')
+                climb = LAND_TAKEOFF_M
+                entry.update(from_ground=True, takeoff_m=climb)
+
+                def climb_watch():
+                    now = time.monotonic()
+                    self.pending_land = dict(lat=lat, lon=lon, alt=alt, climb_to=climb, reposition=message,
+                                             settle_until=now+SETTLE_S, deadline=now+CLIMB_WAIT_S)
+                    entry['ok_text'] = (f'Taking off straight up to {climb:g} m; then flies to the point '
+                                        f'at {alt:g} m and lands')
+                steps = [] if v['mode_id'] == GUIDED else [lambda: self.set_mode(GUIDED)]
+                return steps+[lambda: self.arm(True),
+                              lambda: self.command('Takeoff', mav.MAV_CMD_NAV_TAKEOFF,
+                                                   self.long(mav.MAV_CMD_NAV_TAKEOFF, 0, 0, 0, 0, 0, 0, climb)),
+                              climb_watch]
+            if v['in_air'] is False:
+                raise CommandError('Armed on the ground; disarm first (Fly to point & land arms and takes off itself)')
             lat, lon, alt, message = self.reposition(body, v, entry)
 
             def land_watch():
                 self.pending_land = dict(lat=lat, lon=lon, alt=alt,
                                          deadline=time.monotonic()+ARRIVE_WAIT_S)
-                entry['ok_text'] = 'Flying to the point; will land on arrival'
+                entry['ok_text'] = 'Flying to the point; will land on arrival' + self.travel_speed()
             return [lambda: self.command('Fly to landing point', mav.MAV_CMD_DO_REPOSITION, message),
                     land_watch]
         if action == 'loiter':
@@ -643,13 +712,39 @@ class QuadControl:
             return [lambda: self.arm(False)]
         raise CommandError('Unknown action')
 
-    def reposition(self, body, v, entry):
-        """Validated DO_REPOSITION to a map point (fly-to-point and Loiter)."""
+    def wp_speed(self):
+        """The FC's own waypoint speed in m/s, or None if not read yet."""
+        if 'WP_SPD' in self.params:
+            return float(self.params['WP_SPD'])
+        if 'WPNAV_SPEED' in self.params:
+            return float(self.params['WPNAV_SPEED'])/100
+        return None
+
+    def travel_speed(self):
+        """After a Fly to point & land reposition: ask for LAND_SPEED_FACTOR x
+        the FC's waypoint speed for this leg (DO_CHANGE_SPEED; the FC resets
+        it on the next destination). Never fatal: if the aircraft or its
+        bridge does not accept it, the leg simply flies at the normal speed.
+        Returns a note for the command log."""
+        base = self.wp_speed()
+        if not base or base <= 0:
+            return ' (normal speed: waypoint speed not read from the aircraft)'
+        speed = round(min(base*LAND_SPEED_FACTOR, MAX_TRAVEL_SPEED_M_S), 1)
+        try:
+            self.command('Travel speed', mav.MAV_CMD_DO_CHANGE_SPEED,
+                         self.long(mav.MAV_CMD_DO_CHANGE_SPEED, 1, speed, -1))
+        except (CommandError, OSError) as exc:
+            return f' at the normal {base:g} m/s ({exc})'
+        return f' at {speed:g} m/s'
+
+    def reposition(self, body, v, entry, ground=False):
+        """Validated DO_REPOSITION to a map point (fly-to-point and Loiter).
+        ground=True: the quad will take off first (Fly to point & land)."""
         lat = number(body, 'latitude', -90, 90)
         lon = number(body, 'longitude', -180, 180)
         alt = number(body, 'altitude_m', 1, MAX_ALTITUDE_M)
         entry.update(latitude=round(lat, 7), longitude=round(lon, 7), altitude_m=alt)
-        if not v['armed'] or v['in_air'] is False:
+        if not ground and (not v['armed'] or v['in_air'] is False):
             raise CommandError('Take off first; flying to a point needs the quad in the air')
         if not v['position']:
             raise CommandError('No current position')

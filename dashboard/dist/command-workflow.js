@@ -35,7 +35,9 @@
     if (a.id === 'arm' && ![0, 2, 5, 16].includes(link.mode_id)) return `Mode is ${link.mode}: set the Pocket switch to STABILIZE first.`;
     if (a.id === 'arm_takeoff' && link.armed) return 'Already armed. Use Fly to point & hold, Hold, RTL or Land.';
     if (a.id === 'arm_takeoff' && !link.position) return 'No position fix yet; GUIDED takeoff needs GPS.';
-    if ((a.id === 'goto' || a.id === 'goto_land') && (!link.armed || link.in_air === false)) return 'Take off first (Arm & take off).';
+    if (a.id === 'goto' && (!link.armed || link.in_air === false)) return 'Take off first.';
+    if (a.id === 'goto_land' && link.armed && link.in_air === false) return 'Armed on the ground: disarm first (this command arms and takes off itself).';
+    if (a.id === 'goto_land' && !link.armed && !link.position) return 'No position fix yet; GUIDED takeoff needs GPS.';
     if (a.id === 'arm_mission') {
       const m = live()?.mission;
       if (link.armed) return 'Already armed: the mission launch starts from the ground.';
@@ -220,12 +222,14 @@
         : `CIRCLE_OPTIONS does not start at centre: the circle's centre will be ${c.radius_m} m ahead of the aircraft. `;
       sentence += 'Keep the Pocket throttle centred. ';
     } else if (a.id === 'goto_land' && isLive) {
-      const from = live().link?.position, rb = from && window.FleetTools?.rangeBearing(
+      const c = live(), from = c.link?.position, rb = from && window.FleetTools?.rangeBearing(
         {lat: from.latitude, lng: from.longitude}, {lat: candidate.latitude, lng: candidate.longitude});
-      sentence += `Fly to ${coordinates(candidate)} at ${altitudeValue(a)} m above home` +
+      if (!c.link?.armed) sentence += `From the ground: GUIDED, arm, and climb straight up to ${c.land_takeoff_m} m before any horizontal travel. PROPS WILL SPIN. Then f`;
+      else sentence += 'Leaves its current mode. F';
+      sentence += `ly to ${coordinates(candidate)} at ${altitudeValue(a)} m above home` +
         (rb ? ` (${window.FleetTools.formatDistance(rb.distance)} at ${window.FleetTools.formatBearing(rb.bearing)} from the aircraft)` : '') +
-        ', then switch to LAND within 3 m of it, land and disarm. Make sure the landing spot is clear. ';
-    } else {
+        (c.land_speed_m_s ? ` at ${c.land_speed_m_s} m/s (1.5× its ${c.wp_speed_m_s} m/s waypoint speed, if the aircraft accepts the change)` : '') +
+        ', then switch to LAND within 3 m of it, land and disarm. Make sure the landing spot is clear. ';    } else {
       if (usesPoint(a)) sentence += `Destination ${coordinates(candidate)}. `;
       if (needsAltitude(a)) sentence += `Altitude ${altitudeValue(a)} m above home. `;
       if (!usesPoint(a) && !needsAltitude(a)) sentence += 'No map destination is used. ';

@@ -28,7 +28,7 @@ class FakeBridge:
 
     # The FC's own circle settings, answered to PARAM_REQUEST_READ.
     params = {'CIRCLE_RADIUS_M': 10.0, 'CIRCLE_RATE': 20.0, 'CIRCLE_OPTIONS': 5.0, 'RCMAP_THROTTLE': 3.0,
-              'MAV_GCS_SYSID': 255.0}
+              'MAV_GCS_SYSID': 255.0, 'WP_SPD': 3.0}
     mission = []                    # MISSION_ITEM_INT messages served on request
 
     def vehicle(self, armed=False, mode=4, landed=mav.MAV_LANDED_STATE_ON_GROUND, alt=0.0,

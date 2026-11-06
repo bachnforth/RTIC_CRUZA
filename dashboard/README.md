@@ -145,9 +145,15 @@ stays read-only.
 quadpi's live commands in the workflow:
 **Arm & take off** to 1–120 m (switches to GUIDED, arms, takes off),
 **Fly to point & hold** picked on the map at 1–120 m (within 1 km of the quad),
-**Fly to point & land** (the same flight, then LAND once within 3 m of the point,
-horizontally; any other command or a Pocket mode change on the way cancels the
-landing, and after 300 s it gives up and keeps holding in GUIDED),
+**Fly to point & land** (from the ground it switches to GUIDED, arms and climbs
+straight up to 50 m before any horizontal travel; then, or straight away if
+already flying, it flies to the point at the given altitude at 1.5× the FC's
+WP_SPD, if the aircraft accepts that speed change (DO_CHANGE_SPEED, ground
+speed 0.5–8 m/s: passed by the quadpi bridge from 6 Nov 2026 once reinstalled,
+not by TFW drone's; otherwise the leg falls back to WP_SPD), and switches to
+LAND once within 3 m of the point horizontally; any other command or a Pocket
+mode change on the way cancels it, and it gives up and holds in GUIDED after
+90 s of climbing or 300 s of travel),
 **Loiter (circle)**, **Hold** (BRAKE, ignores the Pocket's sticks), **RTL**,
 **Land here**, **Arm motors (current mode)** and **Disarm** on the ground.
 A point can be picked on the map or typed as an MGRS grid under
