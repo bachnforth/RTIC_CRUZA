@@ -224,3 +224,53 @@ profile if reverting LTE. Existing Wi-Fi/ELRS/FC remain untouched. Tailscale
 logout and service/package removal are separate deliberate rollback steps;
 do not remove a previously existing installation. Installed dependencies are
 recorded in packages.tsv, not automatically uninstalled.
+
+## Observation detector (areas of interest) — 23 October 2026
+
+Optional, opt-in, camera-only. `observe.py` runs on-sensor object detection on
+the IMX500 and publishes small advisory JSON records ("an in-scope object is in
+view, at these angles off boresight") to a loopback UDP port. `observe-tap.py`
+(installed as `/opt/cruza-observe-tap.py`) frames those records onto SSH stdout
+when the laptop dashboard connects, mirroring the video and telemetry taps. The
+laptop joins the angles with the Cruza's own telemetry to place an area of
+interest; a human confirms or dismisses it and decides any tasking. Nothing here
+moves an aircraft.
+
+The detector opens only the camera and a loopback UDP socket. It has no serial,
+MAVLink, route, firewall or modem access, issues no flight command, and the unit
+(`cruza-observe.service`) is resource-limited and locked to localhost traffic.
+The tap has no camera or FC access and sends nothing back to the aircraft.
+
+Deploy (owner, local, as root):
+
+```sh
+sudo bash ~/companion/deploy-observe.sh
+```
+
+It fails early if the IMX500 firmware/model or `python3-picamera2` is missing
+(`sudo apt install imx500-all python3-picamera2`), backs up any prior files and
+the config under `/var/backups/cruza/observe-TIMESTAMP`, installs the detector,
+tap and unit, and adds a default `observe` config block only if none exists. It
+does **not** enable or start the service. No flight, routing, video, firewall or
+modem configuration is changed.
+
+Enable it deliberately after reviewing the camera field-of-view and mount angles
+(`hfov_deg`, `vfov_deg` in config; mount yaw/pitch are set on the dashboard):
+
+```sh
+sudo systemctl enable --now cruza-observe.service
+journalctl -fu cruza-observe
+```
+
+Bench self-test without the camera (emits canned records to the loopback port,
+clearly marked, never a live detection):
+
+```sh
+sudo -u ebach python3 /opt/cruza/observe.py --synthetic 8
+```
+
+Rollback: `sudo systemctl disable --now cruza-observe.service`, remove
+`/etc/systemd/system/cruza-observe.service` and `/opt/cruza-observe-tap.py`,
+restore the backed-up config if desired, then `sudo systemctl daemon-reload`.
+This is the "observation publisher" referenced elsewhere; it stays disabled
+until the owner enables it.

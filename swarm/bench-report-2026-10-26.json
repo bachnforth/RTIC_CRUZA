@@ -1,0 +1,176 @@
+{
+  "generated": "2026-10-26T23:23:38Z",
+  "log": "logs\\2026-10-20\\download-162053_202463\\log_00030.records.json",
+  "checks": [
+    {
+      "name": "all three aircraft have the target in frame",
+      "ok": true,
+      "detail": "3/3 in field of view"
+    },
+    {
+      "name": "records pass the 512-byte cap, tap framing and server validate",
+      "ok": true,
+      "detail": "max 137 B, 3 records, rejects: none"
+    },
+    {
+      "name": "every visible observation resolves to a point",
+      "ok": true,
+      "detail": "3/3 located"
+    },
+    {
+      "name": "round-trip error under 1 m with exact inputs",
+      "ok": true,
+      "detail": "worst 0.01 m"
+    },
+    {
+      "name": "every record is kept by the store",
+      "ok": true,
+      "detail": "3/3 kept"
+    },
+    {
+      "name": "the three reports correlate into one cross-cued area",
+      "ok": true,
+      "detail": "1 track(s), sources ['cruza', 'quadpi', 'rn03'], span 0.0 m"
+    },
+    {
+      "name": "the fused point lands on the truth",
+      "ok": true,
+      "detail": "0.00 m from truth"
+    },
+    {
+      "name": "a target 500 m away is a second track, not merged into the first",
+      "ok": true,
+      "detail": "2 tracks from 4 reports of 2 objects"
+    },
+    {
+      "name": "a 1-degree heading error stays inside the fusion tolerance",
+      "ok": true,
+      "detail": "5/5 bias cases stay under 400 m worst-case"
+    },
+    {
+      "name": "an aircraft with no telemetry still raises an unlocated cue",
+      "ok": true,
+      "detail": "2 tracks, 1 unlocated"
+    },
+    {
+      "name": "malformed records and unknown sources are dropped",
+      "ok": true,
+      "detail": "0/3 kept"
+    },
+    {
+      "name": "150 reports resolve in well under a status poll",
+      "ok": true,
+      "detail": "store 0.3 ms + picture 0.1 ms for 150 reports -> 3 tracks"
+    }
+  ],
+  "verdict": "PASS",
+  "sensitivity": [
+    {
+      "bias": "heading off by 1 deg",
+      "errors_m": {
+        "cruza": 11.5,
+        "quadpi": 1.6,
+        "rn03": 1.2
+      },
+      "tracks": 1,
+      "cross_cued": 1
+    },
+    {
+      "bias": "heading off by 5 deg",
+      "errors_m": {
+        "cruza": 57.6,
+        "quadpi": 7.9,
+        "rn03": 6.1
+      },
+      "tracks": 1,
+      "cross_cued": 1
+    },
+    {
+      "bias": "mount pitch off by 1 deg",
+      "errors_m": {
+        "cruza": 64.9,
+        "quadpi": 3.3,
+        "rn03": 2.6
+      },
+      "tracks": 1,
+      "cross_cued": 1
+    },
+    {
+      "bias": "mount pitch off by 5 deg",
+      "errors_m": {
+        "cruza": 235.1,
+        "quadpi": 15.1,
+        "rn03": 11.9
+      },
+      "tracks": 2,
+      "cross_cued": 1
+    },
+    {
+      "bias": "relative altitude off by 10%",
+      "errors_m": {
+        "cruza": 66.0,
+        "quadpi": 9.0,
+        "rn03": 7.0
+      },
+      "tracks": 1,
+      "cross_cued": 1
+    }
+  ],
+  "picture": {
+    "tracks": [
+      {
+        "id": "cruza/person@0+quadpi/person@0+rn03/person@0",
+        "cls": "person",
+        "score": 0.8,
+        "sources": [
+          "cruza",
+          "quadpi",
+          "rn03"
+        ],
+        "cross_cued": true,
+        "reports": 3,
+        "contributors": [
+          {
+            "src": "cruza",
+            "score": 0.8,
+            "bearing_deg": 121.3,
+            "range_m": 660,
+            "lat": 33.73124149508446,
+            "lon": -85.9151124928718,
+            "estimated": false
+          },
+          {
+            "src": "quadpi",
+            "score": 0.8,
+            "bearing_deg": 45.0,
+            "range_m": 90,
+            "lat": 33.731241496545906,
+            "lon": -85.91511249111454,
+            "estimated": false
+          },
+          {
+            "src": "rn03",
+            "score": 0.8,
+            "bearing_deg": 225.0,
+            "range_m": 70,
+            "lat": 33.73124157660857,
+            "lon": -85.91511239484504,
+            "estimated": false
+          }
+        ],
+        "located": true,
+        "lat": 33.7312415,
+        "lon": -85.9151125,
+        "span_m": 0.0,
+        "estimated": false,
+        "last_seen_age": 0.0
+      }
+    ],
+    "sources": [
+      "cruza",
+      "quadpi",
+      "rn03"
+    ],
+    "cross_cued": 1
+  }
+}

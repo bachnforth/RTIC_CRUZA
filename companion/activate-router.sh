@@ -9,12 +9,18 @@ import sys
 sys.path.insert(0, '/opt/cruza')
 from cruza import config, tail_ip
 c = config('/etc/cruza/config.json')
-peer = tail_ip(c['android_ip'])
+# Primary Android plus any extra GCS phones in android_ip2 (str or list).
+peers = [tail_ip(c['android_ip'])]
+extra = c.get('android_ip2') or []
+for e in ([extra] if isinstance(extra, str) else extra):
+    if e:
+        peers.append(tail_ip(e))
 port = c['mavlink_port']
 print('table inet cruza {')
 print('chain input {')
 print('type filter hook input priority -10; policy accept;')
-print(f'udp dport {port} iifname "tailscale0" ip saddr {peer} accept')
+for p in peers:
+    print(f'udp dport {port} iifname "tailscale0" ip saddr {p} accept')
 print(f'udp dport {port} drop')
 print('}')
 print('}')

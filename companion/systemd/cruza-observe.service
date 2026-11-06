@@ -1,0 +1,32 @@
+[Unit]
+Description=Cruza IMX500 observation detector (advisory, camera-only)
+After=multi-user.target
+# No dependency on the router, video or flight services. Camera-only; this unit
+# never touches the FC, MAVLink, routes or the modem.
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=ebach
+SupplementaryGroups=video render
+ExecStart=/usr/bin/python3 /opt/cruza/observe.py
+Restart=on-failure
+RestartSec=30
+KillMode=control-group
+TimeoutStopSec=15
+Nice=12
+# Advisory detector: resource-bounded and locked down. It opens only a loopback
+# UDP socket and the camera; it has no reason to reach any aircraft service.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+IPAddressAllow=localhost
+IPAddressDeny=any
+MemoryMax=320M
+CPUQuota=60%
+
+[Install]
+WantedBy=multi-user.target

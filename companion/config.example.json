@@ -9,5 +9,15 @@
   "lte_connection": "cruza-lte",
   "lte_interface": "",
   "apn": "america.bics",
-  "usage_warning_bytes": 2000000000
+  "usage_warning_bytes": 2000000000,
+  "observe": {
+    "model": "/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk",
+    "loopback_port": 15620,
+    "min_score": 0.55,
+    "max_rate_hz": 5,
+    "repeat_seconds": 3.0,
+    "hfov_deg": 66.0,
+    "vfov_deg": 49.0,
+    "classes": ["person", "bicycle", "car", "motorcycle", "bus", "truck", "boat", "airplane"]
+  }
 }

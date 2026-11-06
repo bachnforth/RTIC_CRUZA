@@ -1,0 +1,13 @@
+--- a/opt/cruza-telemetry-tap.py
++++ b/opt/cruza-telemetry-tap.py
+@@ -123,6 +123,8 @@
+                     if len(texts) < TEXT_BURST:
+                         texts.append(now)
+                         emit({'frame': raw.hex()})
+-                elif now-last.get(mid, -100) >= .5:
++                # Thin per sender as well as per type: a phone GCS heartbeat
++                # must not crowd out the autopilot's own heartbeat.
++                elif now-last.get(key := (mid, raw[5:7] if raw[0] == 253 else raw[3:5]), -100) >= .5:
+                     emit({'frame': raw.hex()})
+-                    last[mid] = now
++                    last[key] = now

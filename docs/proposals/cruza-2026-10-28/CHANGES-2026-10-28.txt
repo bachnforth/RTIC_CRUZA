@@ -1,0 +1,27 @@
+Copy of ~jbrascom/CHANGES-2026-10-28.txt on the Cruza (tfwcruza1, 100.100.0.34).
+
+Changes made 28 Oct 2026 (from the dashboard laptop, agreed with jbrascom) to fix
+the camera conflict and memory pressure on the Cruza (Pi Zero 2 W, 415 MB RAM).
+
+1. cruza-observe disabled. stream.py replaces it (video + detections from one
+   camera); both were enabled and raced for the IMX500 at every boot.
+   Undo: sudo systemctl enable --now cruza-observe   (and disable cruza-stream)
+2. Boot to console, not the desktop (frees ~100 MB). Network connections are
+   system-wide, so LTE/Wi-Fi/Tailscale/SSH are unaffected.
+   Undo: sudo systemctl set-default graphical.target && sudo reboot
+3. Disabled services the aircraft does not use: packagekit, udisks2, nfs-blkmap,
+   rpcbind (+ rpcbind.socket).
+   Undo: sudo systemctl enable --now packagekit udisks2 nfs-blkmap rpcbind.socket rpcbind
+Previous default target: graphical.target
+4. /opt/cruza-telemetry-tap.py: the 0.5 s thinning is now per sender + message
+   type, not per type. With a phone GCS connected, its heartbeat was dropping
+   the autopilot heartbeat, so the dashboard showed the Cruza offline.
+   Undo: sudo cp -p /opt/cruza-telemetry-tap.py.bak-2026-10-28 /opt/cruza-telemetry-tap.py
+         sudo systemctl restart cruza-telemetry-observer
+5. /opt/cruza/stream.py sends image chips (a small JPEG of each detection, at most
+   every 10 s per class) for the dashboard's handover review; enabled with
+   "chips": true under "observe" in /etc/cruza/config.json.
+   Undo: sudo cp -p /opt/cruza/stream.py.bak-2026-10-28 /opt/cruza/stream.py
+         sudo cp -p /etc/cruza/config.json.bak-2026-10-28 /etc/cruza/config.json
+         sudo systemctl restart cruza-stream
+   (Or keep the code and set "chips": false.)

@@ -1,4 +1,4 @@
-"""Read-only MAVLink log retrieval and parameter snapshot for the connected Cruza."""
+"""Read-only MAVLink log retrieval and parameter snapshot for the connected Cruza (or quadpi)."""
 import sys, time, json, hashlib, argparse
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -9,6 +9,7 @@ from pymavlink import mavutil
 root = Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--port',default='COM17')
+parser.add_argument('--vehicle',choices=('cruza','quadpi'),default='cruza',help='Which aircraft is on the port')
 parser.add_argument('--count',type=int,default=3,help='Number of newest onboard logs to retrieve')
 parser.add_argument('--output-dir',type=Path,help='Optional download directory; default is a new timestamped session')
 args=parser.parse_args()
@@ -22,7 +23,7 @@ h = None
 deadline = time.monotonic()+15
 while time.monotonic()<deadline:
     candidate=c.recv_match(type='HEARTBEAT',blocking=True,timeout=1)
-    if candidate and candidate.autopilot==mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA and candidate.type==mavutil.mavlink.MAV_TYPE_FIXED_WING:
+    if candidate and candidate.autopilot==mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA and candidate.type==(mavutil.mavlink.MAV_TYPE_QUADROTOR if args.vehicle=='quadpi' else mavutil.mavlink.MAV_TYPE_FIXED_WING):
         h=candidate
         break
 if h is None:
@@ -52,7 +53,7 @@ while time.monotonic()<deadline:
         for i in missing[:40]: c.mav.param_request_read_send(s, comp, b'', i)
         last = time.monotonic()
 (out/'parameters.json').write_text(json.dumps({k:v[0] for k,v in params.items()},indent=2,sort_keys=True))
-pfile=root/'params'/f'cruza_params_{stamp}_postflight.params'
+pfile=root/'params'/f'{args.vehicle}_params_{stamp}_postflight.params'
 pfile.write_text('# Read-only USB snapshot; received %d/%d indexes, %d unique names\n'%(len(indexes),count,len(params))+''.join(f'{s}\t{comp}\t{k}\t{v[0]:.9g}\t{v[1]}\n' for k,v in sorted(params.items())))
 print(f'Parameter indexes {len(indexes)}/{count}, unique names {len(params)}', flush=True)
 print({k:v[0] for k,v in params.items() if k.startswith(('TKOFF_', 'THR_', 'TRIM_THROTTLE','SERVO4_','ARSPD_'))},flush=True)

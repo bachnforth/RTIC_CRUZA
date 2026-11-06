@@ -5,7 +5,8 @@ cd -- "$(dirname -- "$0")"
 exec 9>/run/lock/cruza-install.lock
 flock -n 9 || { echo 'Another Cruza installer is running'; exit 1; }
 source /etc/os-release
-[[ ${ID:-} == raspbian && ${VERSION_CODENAME:-} == trixie ]] || { echo 'Installer audited for Raspbian Trixie only'; exit 1; }
+# Raspberry Pi OS Trixie: 32-bit reports ID=raspbian, 64-bit reports ID=debian.
+[[ ( ${ID:-} == raspbian || ${ID:-} == debian ) && ${VERSION_CODENAME:-} == trixie ]] || { echo 'Installer audited for Raspberry Pi OS (Raspbian/Debian) Trixie only'; exit 1; }
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 backup=/var/backups/cruza/$stamp
 install -d -m 700 "$backup"
@@ -18,8 +19,8 @@ apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=3 install -y --no-install
     gstreamer1.0-plugins-bad git meson ninja-build pkg-config g++ libsystemd-dev
 # Official signed Tailscale apt repository; no credentials stored in source.
 if ! command -v tailscale >/dev/null; then
-    curl --fail --location --retry 3 https://pkgs.tailscale.com/stable/raspbian/trixie.noarmor.gpg -o /usr/share/keyrings/tailscale-archive-keyring.gpg
-    curl --fail --location --retry 3 https://pkgs.tailscale.com/stable/raspbian/trixie.tailscale-keyring.list -o /etc/apt/sources.list.d/tailscale.list
+    curl --fail --location --retry 3 "https://pkgs.tailscale.com/stable/${ID}/trixie.noarmor.gpg" -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+    curl --fail --location --retry 3 "https://pkgs.tailscale.com/stable/${ID}/trixie.tailscale-keyring.list" -o /etc/apt/sources.list.d/tailscale.list
     apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=3 update
     apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=3 install -y tailscale
 fi
