@@ -1,0 +1,91 @@
+{
+  "source": "cruza",
+  "truth": null,
+  "tape": {
+    "height_m": 2.46,
+    "distance_m": 3.46,
+    "offset_m": 0.0
+  },
+  "generated": "2026-10-30T16:50:21Z",
+  "records_read": 36,
+  "matched": 36,
+  "used": 2,
+  "selection": "centred samples only",
+  "yaw": {
+    "mean": 6.939999999999998,
+    "n": 2,
+    "stdev": 0.8909545442950435,
+    "min": 6.310000000000002,
+    "max": 7.569999999999993,
+    "median": 6.939999999999998
+  },
+  "pitch_down": {
+    "mean": 32.72840285083561,
+    "n": 2,
+    "stdev": 0.10606601717798113,
+    "min": 32.65340285083561,
+    "max": 32.80340285083561,
+    "median": 32.72840285083561
+  },
+  "heading_spread_deg": 0.0,
+  "range_m": {
+    "min": 3.46,
+    "max": 3.46
+  },
+  "previous": {
+    "hfov": 66.0,
+    "vfov": 49.0,
+    "yaw": 0.0,
+    "pitch_down": 25.0
+  },
+  "suggested": {
+    "hfov": 66.0,
+    "vfov": 49.0,
+    "yaw": 6.94,
+    "pitch_down": 32.73
+  },
+  "warnings": [
+    "Tape geometry: the nose alignment replaces the compass, so this yaw is the mount alone - good. It is a single look angle, so confirm pitch_down in flight before trusting a long-range cue.",
+    "Everything scales with the two tape numbers. At 2.46 m and 3.46 m, 2 cm of height error moves pitch_down 0.22 deg, which is 1 m at 310 m range.",
+    "Aircraft pitch barely varied, so pitch_down includes any pitch estimation bias. Acceptable for level cruise.",
+    "Only 2 samples. Collect 20 or more."
+  ],
+  "samples": [
+    {
+      "t": 1793378881.89,
+      "cls": "person",
+      "score": 0.562,
+      "az_rel_deg": -6.31,
+      "el_rel_deg": 7.85,
+      "ground_range_m": 3.46,
+      "agl_m": 2.46,
+      "target_height_m": 0.85,
+      "effective_height_m": 1.6099999999999999,
+      "heading_deg": 0.0,
+      "pitch_deg": 0.0,
+      "bearing_deg": 0.0,
+      "depression_deg": 24.95340285083561,
+      "yaw_est": 6.310000000000002,
+      "pitch_down_est": 32.80340285083561,
+      "centred": true
+    },
+    {
+      "t": 1793378956.81,
+      "cls": "person",
+      "score": 0.562,
+      "az_rel_deg": -7.57,
+      "el_rel_deg": 7.7,
+      "ground_range_m": 3.46,
+      "agl_m": 2.46,
+      "target_height_m": 0.85,
+      "effective_height_m": 1.6099999999999999,
+      "heading_deg": 0.0,
+      "pitch_deg": 0.0,
+      "bearing_deg": 0.0,
+      "depression_deg": 24.95340285083561,
+      "yaw_est": 7.569999999999993,
+      "pitch_down_est": 32.65340285083561,
+      "centred": true
+    }
+  ]
+}
